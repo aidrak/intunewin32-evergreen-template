@@ -1,0 +1,40 @@
+{
+  "Application": {
+    "Name": "GoogleChrome",
+    "Filter": {
+      "Architecture": "x64",
+      "Channel": "stable"
+    }
+  },
+  "PackageInformation": {
+    "SetupType": "MSI",
+    "SetupFile": "googlechromestandaloneenterprise64.msi",
+    "Version": "YOURVERSION"
+  },
+  "Information": {
+    "DisplayName": "Google Chrome",
+    "Description": "Google Chrome is a fast, secure, and free web browser.",
+    "Publisher": "Google LLC",
+    "InformationURL": "https://www.google.com/intl/en/chrome/",
+    "PrivacyURL": "https://policies.google.com/privacy"
+  },
+  "Program": {
+    "InstallCommand": "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File .\\Install.ps1",
+    "UninstallCommand": "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File .\\Uninstall.ps1",
+    "InstallExperience": "system",
+    "DeviceRestartBehavior": "suppress"
+  },
+  "RequirementRule": {
+    "MinimumRequiredOperatingSystem": "W10_1809",
+    "Architecture": "x64"
+  },
+  "DetectionRule": {
+    "Type": "File",
+    "Path": "C:\\Program Files\\Google\\Chrome\\Application",
+    "FileOrFolder": "chrome.exe",
+    "Check32BitOn64System": false,
+    "DetectionType": "Version",
+    "Operator": "greaterThanOrEqual",
+    "Value": "YOURVERSION"
+  }
+}
