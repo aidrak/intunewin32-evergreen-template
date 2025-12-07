@@ -1,209 +1,143 @@
 # Intune Win32 Evergreen Template
 
-A template repository for deploying Windows applications via Microsoft Intune using the [Evergreen](https://github.com/aaronparker/evergreen) PowerShell module.
+Deploy Windows applications via Microsoft Intune that **automatically download the latest version** at install time using the [Evergreen](https://github.com/aaronparker/evergreen) PowerShell module.
 
-Based on patterns from [PSPackageFactory](https://github.com/aaronparker/packagefactory) by Aaron Parker.
+**No need to repackage when updates are released** - the scripts always pull the latest version from the vendor.
 
-## Features
+## How It Works
 
-- **Evergreen Integration**: Automatically downloads latest application versions
-- **Standardized Structure**: Consistent package layout for all applications
-- **Enterprise Ready**: Pre-configured for silent installation with update suppression
-- **Detection Scripts**: PowerShell-based detection for Intune compliance
+1. Package the PowerShell scripts as a `.intunewin` file (one time)
+2. Deploy via Intune
+3. At install time, the script:
+   - Installs the Evergreen module
+   - Queries for the latest version/download URL
+   - Downloads directly from the vendor
+   - Installs silently with enterprise settings
+   - Cleans up
+
+## Included Applications
+
+| Package | Description |
+|---------|-------------|
+| **GoogleChrome** | Chrome Enterprise x64 MSI |
+| **AdobeAcrobatReaderDC** | Reader DC x64 English with update suppression |
+| **AdobeAcrobatReaderDCMUIVDI** | Reader DC x64 Multi-language with VDI optimizations |
 
 ## Repository Structure
 
 ```
-intunewin32-evergreen-template/
-├── install/
-│   ├── Install.ps1          # Generic installation script
-│   └── Install.psm1         # Shared functions module
-├── packages/
-│   ├── GoogleChrome/
-│   │   ├── App.json          # Intune app configuration
-│   │   └── Source/
-│   │       ├── Install.json      # Installation configuration
-│   │       ├── Install.ps1       # Installation script
-│   │       ├── Uninstall.ps1     # Uninstallation script
-│   │       ├── Detect.ps1        # Detection script
-│   │       └── initial_preferences
-│   ├── AdobeAcrobatReaderDC/
-│   │   └── Source/
-│   │       ├── Install.json
-│   │       ├── Install.ps1
-│   │       └── Detect.ps1
-│   └── AdobeAcrobatReaderDCMUIVDI/
-│       └── Source/
-│           ├── Install.json
-│           ├── Install.ps1
-│           ├── Detect.ps1
-│           └── VDI-enUS.mst      # Optional VDI transform
-├── scripts/
-│   ├── Get-LatestInstallers.ps1  # Download latest versions
-│   └── New-IntuneWin32Package.ps1 # Create .intunewin files
-└── output/                       # Generated .intunewin packages
+packages/
+├── GoogleChrome/
+│   ├── Install.ps1      # Downloads & installs latest Chrome
+│   ├── Uninstall.ps1    # Removes Chrome
+│   └── Detect.ps1       # Detection script for Intune
+├── AdobeAcrobatReaderDC/
+│   ├── Install.ps1
+│   ├── Uninstall.ps1
+│   └── Detect.ps1
+└── AdobeAcrobatReaderDCMUIVDI/
+    ├── Install.ps1      # Includes VDI optimizations
+    ├── Uninstall.ps1
+    └── Detect.ps1
 ```
-
-## Included Applications
-
-| Application | Description |
-|-------------|-------------|
-| **Google Chrome Enterprise** | Enterprise MSI with initial preferences |
-| **Adobe Acrobat Reader DC** | Standard x64 version with update suppression |
-| **Adobe Acrobat Reader DC MUI VDI** | Multi-language VDI-optimized version |
-
-## Prerequisites
-
-1. **PowerShell 5.1** (Windows PowerShell)
-2. **Evergreen Module**:
-   ```powershell
-   Install-Module -Name Evergreen -Force
-   ```
-3. **Microsoft Win32 Content Prep Tool** (for creating .intunewin packages):
-   - Download from [GitHub](https://github.com/microsoft/Microsoft-Win32-Content-Prep-Tool)
-   - Place `IntuneWinAppUtil.exe` in `scripts/` or `tools/` folder
 
 ## Quick Start
 
-### 1. Download Latest Installers
+### 1. Create the .intunewin Package
 
-```powershell
-# Download all applications
-.\scripts\Get-LatestInstallers.ps1
+Download [IntuneWinAppUtil.exe](https://github.com/microsoft/Microsoft-Win32-Content-Prep-Tool) and run:
 
-# Download specific application
-.\scripts\Get-LatestInstallers.ps1 -AppName GoogleChrome
+```cmd
+IntuneWinAppUtil.exe -c "packages\GoogleChrome" -s "Install.ps1" -o "output" -q
 ```
 
-### 2. Create Intune Packages
+### 2. Upload to Intune
 
-```powershell
-# Package all applications
-.\scripts\New-IntuneWin32Package.ps1
+1. Go to [Intune admin center](https://intune.microsoft.com) → **Apps** → **All apps** → **Add**
+2. Select **Windows app (Win32)**
+3. Upload the `.intunewin` file
 
-# Package specific application
-.\scripts\New-IntuneWin32Package.ps1 -AppName GoogleChrome
-```
+### 3. Configure the App
 
-### 3. Upload to Intune
+| Setting | Value |
+|---------|-------|
+| **Install command** | `powershell.exe -ExecutionPolicy Bypass -File .\Install.ps1` |
+| **Uninstall command** | `powershell.exe -ExecutionPolicy Bypass -File .\Uninstall.ps1` |
+| **Install behavior** | System |
+| **Detection rules** | Use custom script → upload `Detect.ps1` |
+| **Requirements** | 64-bit, Windows 10 1809+ |
 
-1. Open [Microsoft Intune admin center](https://intune.microsoft.com)
-2. Navigate to **Apps** > **All apps** > **Add**
-3. Select **Windows app (Win32)**
-4. Upload the `.intunewin` file from `output/` folder
-5. Configure using values from `App.json`:
-   - **Install command**: `powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File .\Install.ps1`
-   - **Uninstall command**: See App.json for application-specific command
-   - **Detection rules**: Use the `Detect.ps1` script or file-based detection from App.json
+## Requirements
 
-## Package Configuration
+- **Internet access** on endpoints during installation
+- **PowerShell 5.1** (built into Windows 10/11)
+- Endpoints must be able to reach:
+  - `powershellgallery.com` (for Evergreen module)
+  - Vendor download servers (Google, Adobe CDN)
 
-### App.json
+## What Each Package Does
 
-Contains Intune app metadata and configuration:
+### Google Chrome
+- Downloads latest stable x64 MSI
+- Silent install with `ALLUSERS=1`
+- Removes desktop shortcut
 
-```json
-{
-  "Application": {
-    "Name": "GoogleChrome",
-    "Filter": { "Architecture": "x64", "Channel": "stable" }
-  },
-  "PackageInformation": {
-    "SetupType": "MSI",
-    "SetupFile": "googlechromestandaloneenterprise64.msi",
-    "Version": "142.0.7444.176"
-  },
-  "Program": {
-    "InstallCommand": "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File .\\Install.ps1",
-    "UninstallCommand": "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File .\\Uninstall.ps1"
-  },
-  "DetectionRule": {
-    "Type": "File",
-    "Path": "C:\\Program Files\\Google\\Chrome\\Application",
-    "FileOrFolder": "chrome.exe",
-    "DetectionType": "Version",
-    "Operator": "greaterThanOrEqual",
-    "Value": "142.0.7444.176"
-  }
-}
-```
+### Adobe Acrobat Reader DC
+- Downloads latest x64 English version
+- Disables browser integration
+- Disables Chrome extension
+- Disables auto-updates (AdobeARMservice)
+- Removes scheduled update tasks
+- Suppresses upsell messages
+- Removes desktop shortcuts
 
-### Install.json
-
-Configuration for the installation script:
-
-```json
-{
-  "PackageInformation": {
-    "SetupType": "MSI",
-    "SetupFile": "googlechromestandaloneenterprise64.msi",
-    "Version": "142.0.7444.176"
-  },
-  "InstallTasks": {
-    "ArgumentList": "/package \"#SetupFile\" ALLUSERS=1 /quiet /log \"#LogPath\\#LogName.log\"",
-    "Wait": 10
-  },
-  "PostInstall": {
-    "Remove": ["C:\\Users\\Public\\Desktop\\Google Chrome.lnk"],
-    "CopyFile": [
-      { "Source": "initial_preferences", "Destination": "C:\\Program Files\\Google\\Chrome\\Application\\initial_preferences" }
-    ]
-  }
-}
-```
+### Adobe Acrobat Reader DC MUI VDI
+Same as above, plus:
+- Multi-language support
+- Disabled thumbnail preview (reduces IOPS)
+- Additional ARM registry tweaks for golden images
 
 ## Adding New Applications
 
-1. Create a new folder under `packages/` with the application name
-2. Create `App.json` with Intune metadata
-3. Create `Source/` folder with:
-   - `Install.json` - Installation configuration
-   - `Install.ps1` - Installation script
-   - `Detect.ps1` - Detection script
-   - Any additional files (transforms, preferences, etc.)
-4. Add the application to `scripts/Get-LatestInstallers.ps1` if using Evergreen
-
-### Evergreen Application Names
-
-Find available applications:
+1. Create a folder under `packages/`
+2. Create `Install.ps1` using this template:
 
 ```powershell
-Find-EvergreenApp | Select-Object -ExpandProperty Name
+# Install/Import Evergreen
+if (-not (Get-Module -Name Evergreen -ListAvailable)) {
+    Install-PackageProvider -Name NuGet -Force -Scope AllUsers | Out-Null
+    Install-Module -Name Evergreen -Force -Scope AllUsers
+}
+Import-Module -Name Evergreen -Force
+
+# Get latest version
+$App = Get-EvergreenApp -Name "YourAppName" |
+    Where-Object { $_.Architecture -eq "x64" } |
+    Select-Object -First 1
+
+# Download
+Invoke-WebRequest -Uri $App.URI -OutFile "installer.exe" -UseBasicParsing
+
+# Install
+Start-Process -FilePath "installer.exe" -ArgumentList "/silent" -Wait
 ```
 
-Get application details:
-
-```powershell
-Get-EvergreenApp -Name "GoogleChrome" | Format-List
-```
+3. Find available apps: `Get-EvergreenApp | Select-Object -ExpandProperty Name`
 
 ## Logging
 
-Installation logs are written to:
+Install logs are written to:
 ```
-C:\ProgramData\Microsoft\IntuneManagementExtension\Logs\
+C:\ProgramData\Microsoft\IntuneManagementExtension\Logs\{AppName}-Install.log
 ```
-
-Log files follow the pattern: `{AppName}-Install.log`
-
-## VDI Optimization
-
-The `AdobeAcrobatReaderDCMUIVDI` package includes optimizations for virtual desktop environments:
-
-- Disabled thumbnail preview generation
-- Disabled update services
-- Reduced mode enforcement
-- Multi-language support
-
-For VDI deployments, place your custom `.mst` transform file in the Source folder.
 
 ## References
 
-- [Evergreen Documentation](https://eucpilots.com/evergreen-docs/)
-- [PSPackageFactory](https://github.com/aaronparker/packagefactory)
-- [Intune Win32 App Management](https://docs.microsoft.com/mem/intune/apps/apps-win32-app-management)
+- [Evergreen Documentation](https://stealthpuppy.com/evergreen/)
+- [Evergreen GitHub](https://github.com/aaronparker/evergreen)
 - [Win32 Content Prep Tool](https://github.com/microsoft/Microsoft-Win32-Content-Prep-Tool)
+- [Intune Win32 App Management](https://docs.microsoft.com/mem/intune/apps/apps-win32-app-management)
 
 ## License
 
-MIT License - Feel free to use and modify for your organization.
+MIT

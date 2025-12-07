@@ -2,31 +2,13 @@
 output/
 *.intunewin
 
-# Downloaded installers (can be large)
-packages/*/Source/*.msi
-packages/*/Source/*.exe
-packages/*/Source/*.zip
-
-# Keep MST transform files
-!packages/*/Source/*.mst
-
 # Windows
 Thumbs.db
 Desktop.ini
 
-# PowerShell
-*.psm1.bak
-*.ps1.bak
-
-# Tools (download separately)
-tools/IntuneWinAppUtil.exe
-scripts/IntuneWinAppUtil.exe
-
 # IDE
 .vscode/
 .idea/
-*.suo
-*.user
 
 # Logs
 *.log
