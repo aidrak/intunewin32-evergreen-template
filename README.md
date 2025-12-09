@@ -9,10 +9,10 @@ Deploy Windows applications via Microsoft Intune that **automatically download t
 1. Package the PowerShell scripts as a `.intunewin` file (one time)
 2. Deploy via Intune
 3. At install time, the script:
-   - Installs the Evergreen module
+   - Trusts PSGallery and installs/updates the Evergreen module
    - Queries for the latest version/download URL
-   - Downloads directly from the vendor
-   - Installs silently with enterprise settings
+   - Downloads directly from the vendor using `Save-EvergreenApp`
+   - Installs silently with enterprise/VDI settings
    - Cleans up
 
 ## Included Applications
@@ -20,8 +20,8 @@ Deploy Windows applications via Microsoft Intune that **automatically download t
 | Package | Description |
 |---------|-------------|
 | **GoogleChrome** | Chrome Enterprise x64 MSI |
-| **AdobeAcrobatReaderDC** | Reader DC x64 English with update suppression |
-| **AdobeAcrobatReaderDCMUIVDI** | Reader DC x64 Multi-language with VDI optimizations |
+| **AdobeAcrobatReaderDC** | Reader DC x64 MUI with VDI optimizations |
+| **AdobeAcrobatDC** | Acrobat DC Pro/Standard x64 (requires licensing) |
 
 ## Repository Structure
 
@@ -32,11 +32,11 @@ packages/
 │   ├── Uninstall.ps1    # Removes Chrome
 │   └── Detect.ps1       # Detection script for Intune
 ├── AdobeAcrobatReaderDC/
-│   ├── Install.ps1
+│   ├── Install.ps1      # Reader with VDI optimizations
 │   ├── Uninstall.ps1
 │   └── Detect.ps1
-└── AdobeAcrobatReaderDCMUIVDI/
-    ├── Install.ps1      # Includes VDI optimizations
+└── AdobeAcrobatDC/
+    ├── Install.ps1      # Pro/Standard with VDI optimizations
     ├── Uninstall.ps1
     └── Detect.ps1
 ```
@@ -49,11 +49,13 @@ Download [IntuneWinAppUtil.exe](https://github.com/microsoft/Microsoft-Win32-Con
 
 ```cmd
 IntuneWinAppUtil.exe -c "packages\GoogleChrome" -s "Install.ps1" -o "output" -q
+IntuneWinAppUtil.exe -c "packages\AdobeAcrobatReaderDC" -s "Install.ps1" -o "output" -q
+IntuneWinAppUtil.exe -c "packages\AdobeAcrobatDC" -s "Install.ps1" -o "output" -q
 ```
 
 ### 2. Upload to Intune
 
-1. Go to [Intune admin center](https://intune.microsoft.com) → **Apps** → **All apps** → **Add**
+1. Go to [Intune admin center](https://intune.microsoft.com) > **Apps** > **All apps** > **Add**
 2. Select **Windows app (Win32)**
 3. Upload the `.intunewin` file
 
@@ -64,7 +66,7 @@ IntuneWinAppUtil.exe -c "packages\GoogleChrome" -s "Install.ps1" -o "output" -q
 | **Install command** | `powershell.exe -ExecutionPolicy Bypass -File .\Install.ps1` |
 | **Uninstall command** | `powershell.exe -ExecutionPolicy Bypass -File .\Uninstall.ps1` |
 | **Install behavior** | System |
-| **Detection rules** | Use custom script → upload `Detect.ps1` |
+| **Detection rules** | Use custom script > upload `Detect.ps1` |
 | **Requirements** | 64-bit, Windows 10 1809+ |
 
 ## Requirements
@@ -78,24 +80,25 @@ IntuneWinAppUtil.exe -c "packages\GoogleChrome" -s "Install.ps1" -o "output" -q
 ## What Each Package Does
 
 ### Google Chrome
-- Downloads latest stable x64 MSI
+- Downloads latest stable x64 MSI via Evergreen
+- Uses `Save-EvergreenApp` for reliable downloads
 - Silent install with `ALLUSERS=1`
 - Removes desktop shortcut
 
 ### Adobe Acrobat Reader DC
-- Downloads latest x64 English version
-- Disables browser integration
-- Disables Chrome extension
+- Downloads latest x64 MUI version (with English fallback)
+- Installs with `ALLUSERS=1` for VDI/multi-user environments
+- Disables browser integration and Chrome extension
 - Disables auto-updates (AdobeARMservice)
 - Removes scheduled update tasks
-- Suppresses upsell messages
+- Suppresses upsell/in-product messages
+- Disables thumbnail preview generation (reduces IOPS)
 - Removes desktop shortcuts
 
-### Adobe Acrobat Reader DC MUI VDI
-Same as above, plus:
-- Multi-language support
-- Disabled thumbnail preview (reduces IOPS)
-- Additional ARM registry tweaks for golden images
+### Adobe Acrobat DC (Pro/Standard)
+- Downloads latest x64 version via Evergreen
+- Same VDI/enterprise optimizations as Reader
+- **Requires valid Adobe licensing** (volume license, named user, or subscription)
 
 ## Adding New Applications
 
@@ -103,26 +106,31 @@ Same as above, plus:
 2. Create `Install.ps1` using this template:
 
 ```powershell
-# Install/Import Evergreen
+# Trust PSGallery and install/update Evergreen
+if (Get-PSRepository | Where-Object { $_.Name -eq "PSGallery" -and $_.InstallationPolicy -ne "Trusted" }) {
+    Install-PackageProvider -Name "NuGet" -MinimumVersion 2.8.5.208 -Force | Out-Null
+    Set-PSRepository -Name "PSGallery" -InstallationPolicy "Trusted"
+}
+
 if (-not (Get-Module -Name Evergreen -ListAvailable)) {
-    Install-PackageProvider -Name NuGet -Force -Scope AllUsers | Out-Null
     Install-Module -Name Evergreen -Force -Scope AllUsers
 }
 Import-Module -Name Evergreen -Force
+Update-Module -Name Evergreen -Force -ErrorAction SilentlyContinue
 
 # Get latest version
 $App = Get-EvergreenApp -Name "YourAppName" |
     Where-Object { $_.Architecture -eq "x64" } |
     Select-Object -First 1
 
-# Download
-Invoke-WebRequest -Uri $App.URI -OutFile "installer.exe" -UseBasicParsing
+# Download using Save-EvergreenApp
+$Download = $App | Save-EvergreenApp -Path $env:TEMP
 
 # Install
-Start-Process -FilePath "installer.exe" -ArgumentList "/silent" -Wait
+Start-Process -FilePath $Download.FullName -ArgumentList "/silent" -Wait
 ```
 
-3. Find available apps: `Get-EvergreenApp | Select-Object -ExpandProperty Name`
+3. Find available apps: `Find-EvergreenApp -Name "keyword"`
 
 ## Logging
 

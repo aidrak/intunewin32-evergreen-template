@@ -12,6 +12,7 @@
 #>
 
 $Paths = @(
+    "C:\Program Files\Adobe\Acrobat Reader DC\Reader\AcroRd64.exe",
     "C:\Program Files\Adobe\Acrobat DC\Acrobat\Acrobat.exe",
     "C:\Program Files (x86)\Adobe\Acrobat Reader DC\Reader\AcroRd32.exe"
 )

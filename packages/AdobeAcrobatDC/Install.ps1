@@ -1,21 +1,22 @@
 #Requires -Version 5.1
 <#
     .SYNOPSIS
-        Install Adobe Acrobat Reader DC (latest version via Evergreen).
+        Install Adobe Acrobat DC Pro/Standard (latest version via Evergreen).
 
     .DESCRIPTION
-        Downloads and installs the latest Adobe Acrobat Reader DC x64
+        Downloads and installs the latest Adobe Acrobat DC Pro/Standard x64
         directly from Adobe using the Evergreen PowerShell module.
         Configured for VDI/multi-user environments with ALLUSERS flag.
 
     .NOTES
         Deploy via Intune as Win32 app.
         Install command: powershell.exe -ExecutionPolicy Bypass -File .\Install.ps1
+        Requires valid Adobe licensing (volume license, named user, or subscription).
 #>
 [CmdletBinding()]
 param()
 
-$AppName = "AdobeAcrobatReaderDC"
+$AppName = "AdobeAcrobatDC"
 $LogPath = "C:\ProgramData\Microsoft\IntuneManagementExtension\Logs"
 $LogFile = Join-Path -Path $LogPath -ChildPath "$AppName-Install.log"
 $TempPath = Join-Path -Path $env:TEMP -ChildPath $AppName
@@ -36,7 +37,7 @@ try {
     Write-Log "Starting $AppName installation"
 
     # Stop any running Adobe processes
-    Get-Process -Name "AcroRd32", "Acrobat" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Get-Process -Name "AcroRd32", "Acrobat", "AcroCEF", "AdobeCollabSync" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     Write-Log "Stopped Adobe processes"
 
     # Trust PSGallery and install/update Evergreen
@@ -53,19 +54,11 @@ try {
     Import-Module -Name Evergreen -Force
     Update-Module -Name Evergreen -Force -ErrorAction SilentlyContinue
 
-    # Get latest version (MUI = Multi-language for broader VDI compatibility)
+    # Get latest version - AdobeAcrobatProStdDC provides Pro/Standard DC downloads
     Write-Log "Querying Evergreen for latest version..."
-    $App = Get-EvergreenApp -Name "AdobeAcrobatReaderDC" |
-        Where-Object { $_.Architecture -eq "x64" -and $_.Language -eq "MUI" } |
+    $App = Get-EvergreenApp -Name "AdobeAcrobatProStdDC" |
+        Where-Object { $_.Architecture -eq "x64" } |
         Select-Object -First 1
-
-    # Fallback to English if MUI not available
-    if (-not $App) {
-        Write-Log "MUI not available, falling back to English..."
-        $App = Get-EvergreenApp -Name "AdobeAcrobatReaderDC" |
-            Where-Object { $_.Architecture -eq "x64" -and $_.Language -eq "English" } |
-            Select-Object -First 1
-    }
 
     if (-not $App) { throw "Failed to get application info from Evergreen" }
 
@@ -79,10 +72,29 @@ try {
     if (-not $Download -or -not (Test-Path $Download.FullName)) { throw "Download failed" }
     Write-Log "Download complete: $($Download.FullName)"
 
+    # Check if download is a ZIP file and extract it
+    $InstallerPath = $Download.FullName
+    if ($Download.FullName -like "*.zip") {
+        Write-Log "Extracting ZIP archive..."
+        $ExtractPath = Join-Path -Path $TempPath -ChildPath "Extracted"
+        Expand-Archive -Path $Download.FullName -DestinationPath $ExtractPath -Force
+
+        # Find setup.exe in extracted folder
+        $SetupExe = Get-ChildItem -Path $ExtractPath -Recurse -Filter "setup.exe" | Select-Object -First 1
+        if (-not $SetupExe) {
+            # Try Setup.exe (case sensitivity)
+            $SetupExe = Get-ChildItem -Path $ExtractPath -Recurse -Filter "Setup.exe" | Select-Object -First 1
+        }
+        if (-not $SetupExe) { throw "Could not find setup.exe in extracted archive" }
+
+        $InstallerPath = $SetupExe.FullName
+        Write-Log "Found installer: $InstallerPath"
+    }
+
     # Install with ALLUSERS for VDI/multi-user environments
     Write-Log "Installing..."
     $Arguments = "/sAll /rs /rps /msi ALLUSERS=1 EULA_ACCEPT=YES DISABLEDESKTOPSHORTCUT=1"
-    $Process = Start-Process -FilePath $Download.FullName -ArgumentList $Arguments -Wait -PassThru -NoNewWindow
+    $Process = Start-Process -FilePath $InstallerPath -ArgumentList $Arguments -Wait -PassThru -NoNewWindow
     Write-Log "Install exit code: $($Process.ExitCode)"
 
     # Wait for install to complete

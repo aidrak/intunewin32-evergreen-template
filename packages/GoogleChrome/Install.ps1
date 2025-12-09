@@ -34,15 +34,19 @@ try {
 
     Write-Log "Starting $AppName installation"
 
-    # Install/Import Evergreen
-    Write-Log "Loading Evergreen module..."
+    # Trust PSGallery and install/update Evergreen
+    Write-Log "Configuring PowerShell Gallery..."
+    if (Get-PSRepository | Where-Object { $_.Name -eq "PSGallery" -and $_.InstallationPolicy -ne "Trusted" }) {
+        Install-PackageProvider -Name "NuGet" -MinimumVersion 2.8.5.208 -Force | Out-Null
+        Set-PSRepository -Name "PSGallery" -InstallationPolicy "Trusted"
+    }
+
+    Write-Log "Installing/updating Evergreen module..."
     if (-not (Get-Module -Name Evergreen -ListAvailable)) {
-        Write-Log "Installing Evergreen module..."
-        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope AllUsers | Out-Null
-        Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
         Install-Module -Name Evergreen -Force -Scope AllUsers
     }
     Import-Module -Name Evergreen -Force
+    Update-Module -Name Evergreen -Force -ErrorAction SilentlyContinue
 
     # Get latest version
     Write-Log "Querying Evergreen for latest version..."
@@ -55,26 +59,32 @@ try {
     Write-Log "Found version: $($App.Version)"
     Write-Log "Download URL: $($App.URI)"
 
-    # Download
-    $InstallerPath = Join-Path -Path $TempPath -ChildPath "GoogleChromeEnterprise.msi"
-    Write-Log "Downloading to: $InstallerPath"
-    Invoke-WebRequest -Uri $App.URI -OutFile $InstallerPath -UseBasicParsing
+    # Download using Save-EvergreenApp
+    Write-Log "Downloading installer..."
+    $Download = $App | Save-EvergreenApp -Path $TempPath -ErrorAction Stop
 
-    if (-not (Test-Path $InstallerPath)) { throw "Download failed" }
-    Write-Log "Download complete"
+    if (-not $Download -or -not (Test-Path $Download.FullName)) { throw "Download failed" }
+    Write-Log "Download complete: $($Download.FullName)"
 
     # Install
     Write-Log "Installing..."
-    $Arguments = "/i `"$InstallerPath`" ALLUSERS=1 /quiet /norestart /log `"$LogPath\$AppName-MSI.log`""
+    $Arguments = "/i `"$($Download.FullName)`" ALLUSERS=1 /quiet /norestart /log `"$LogPath\$AppName-MSI.log`""
     $Process = Start-Process -FilePath "msiexec.exe" -ArgumentList $Arguments -Wait -PassThru -NoNewWindow
     Write-Log "Install exit code: $($Process.ExitCode)"
 
-    # Post-install: Remove desktop shortcut
+    # Post-install: Ensure desktop shortcut exists on public desktop
     Start-Sleep -Seconds 5
     $Shortcut = "C:\Users\Public\Desktop\Google Chrome.lnk"
-    if (Test-Path $Shortcut) {
-        Remove-Item -Path $Shortcut -Force -ErrorAction SilentlyContinue
-        Write-Log "Removed desktop shortcut"
+    if (-not (Test-Path $Shortcut)) {
+        $WshShell = New-Object -ComObject WScript.Shell
+        $ShortcutObj = $WshShell.CreateShortcut($Shortcut)
+        $ShortcutObj.TargetPath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+        $ShortcutObj.WorkingDirectory = "C:\Program Files\Google\Chrome\Application"
+        $ShortcutObj.Description = "Google Chrome"
+        $ShortcutObj.Save()
+        Write-Log "Created desktop shortcut"
+    } else {
+        Write-Log "Desktop shortcut already exists"
     }
 
     # Cleanup

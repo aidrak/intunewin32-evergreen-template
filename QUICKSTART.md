@@ -1,82 +1,37 @@
-# Quick Start: Deploy to Intune
+# IntuneWin Packaging on Ubuntu
 
-Pre-built packages that automatically install the latest version from the vendor.
+## Setup (One-time)
+```bash
+pwsh
+Install-Module -Name SvRooij.ContentPrep.Cmdlet -Scope CurrentUser -Force
+```
 
-## Step 1: Download
+## Create .intunewin Package
+```powershell
+New-IntuneWinPackage -SourcePath "<source_folder>" -SetupFile "<setup_file>" -DestinationPath "<output_folder>"
+```
 
-Download the `.intunewin` file from the `output/` folder:
-- `GoogleChrome.intunewin`
-- `AdobeAcrobatReaderDC.intunewin`
-- `AdobeAcrobatReaderDCMUIVDI.intunewin` (for Citrix/AVD/RDS)
+### Parameters
+- **SourcePath**: Folder containing all app files to package
+- **SetupFile**: Main installer file (relative to SourcePath or full name only)
+- **DestinationPath**: Where to save the .intunewin file
 
-## Step 2: Upload to Intune
+### Example
+```powershell
+# Package an MSI installer
+New-IntuneWinPackage -SourcePath "/home/user/apps/chrome" -SetupFile "chrome.msi" -DestinationPath "/home/user/output"
 
-1. Go to [intune.microsoft.com](https://intune.microsoft.com)
-2. Navigate to **Apps** → **All apps** → **Add**
-3. Select **Windows app (Win32)** → **Select**
-4. Click **Select app package file** and upload the `.intunewin` file
+# Package a PowerShell script
+New-IntuneWinPackage -SourcePath "/home/user/apps/script" -SetupFile "install.ps1" -DestinationPath "/home/user/output"
+```
 
-## Step 3: Configure App Information
+## Extract .intunewin Package (Optional)
+```powershell
+Unlock-IntuneWinPackage -SourceFile "<file.intunewin>" -DestinationPath "<extract_folder>"
+```
 
-| Field | Google Chrome | Adobe Reader DC |
-|-------|---------------|-----------------|
-| **Name** | Google Chrome | Adobe Acrobat Reader DC |
-| **Publisher** | Google LLC | Adobe Inc. |
-
-## Step 4: Configure Program
-
-| Setting | Value |
-|---------|-------|
-| **Install command** | `powershell.exe -ExecutionPolicy Bypass -File .\Install.ps1` |
-| **Uninstall command** | `powershell.exe -ExecutionPolicy Bypass -File .\Uninstall.ps1` |
-| **Install behavior** | System |
-| **Device restart behavior** | No specific action |
-
-## Step 5: Configure Requirements
-
-| Setting | Value |
-|---------|-------|
-| **Operating system architecture** | 64-bit |
-| **Minimum operating system** | Windows 10 1809 |
-
-## Step 6: Configure Detection Rules
-
-| Setting | Value |
-|---------|-------|
-| **Rules format** | Manually configure detection rules |
-| **Rule type** | File |
-
-### Google Chrome
-| Setting | Value |
-|---------|-------|
-| **Path** | `C:\Program Files\Google\Chrome\Application` |
-| **File** | `chrome.exe` |
-| **Detection method** | File or folder exists |
-
-### Adobe Acrobat Reader DC
-| Setting | Value |
-|---------|-------|
-| **Path** | `C:\Program Files\Adobe\Acrobat DC\Acrobat` |
-| **File** | `Acrobat.exe` |
-| **Detection method** | File or folder exists |
-
-## Step 7: Assign
-
-1. Click **Next** through Dependencies and Supersedence
-2. Under **Assignments**, add your target groups:
-   - **Required** = Auto-install
-   - **Available** = User can install from Company Portal
-3. Click **Create**
-
-## Done
-
-The app will deploy and always install the latest version from the vendor at install time.
-
----
-
-## Requirements
-
-Endpoints need internet access to:
-- `powershellgallery.com` (Evergreen module)
-- `dl.google.com` (Chrome)
-- `ardownload2.adobe.com` (Adobe Reader)
+## Notes
+- Cross-platform replacement for IntuneWinAppUtil.exe
+- Works natively on Linux with PowerShell Core
+- Does NOT extract MSI metadata (ProductCode, etc.) - use Windows tool if needed
+- Approximately 2x faster than official Microsoft tool
