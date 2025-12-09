@@ -51,7 +51,10 @@ try {
         Install-Module -Name Evergreen -Force -Scope AllUsers
     }
     Import-Module -Name Evergreen -Force
-    Update-Module -Name Evergreen -Force -ErrorAction SilentlyContinue
+
+    # Download Evergreen app manifests (required for SYSTEM account)
+    Write-Log "Updating Evergreen manifests..."
+    Update-Evergreen -ErrorAction SilentlyContinue
 
     # Get latest version (MUI = Multi-language for broader VDI compatibility)
     Write-Log "Querying Evergreen for latest version..."
