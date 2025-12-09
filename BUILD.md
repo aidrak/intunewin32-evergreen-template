@@ -15,24 +15,20 @@ Download [IntuneWinAppUtil.exe](https://github.com/microsoft/Microsoft-Win32-Con
 
 ## Build Packages
 
+Each package folder contains a dummy `.txt` file (e.g., `GoogleChrome.txt`) used to name the output `.intunewin` file. Point the build command at this file.
+
 ### Linux/macOS
 ```powershell
-# Build all packages
-New-IntuneWinPackage -SourcePath "packages/GoogleChrome" -SetupFile "Install.ps1" -DestinationPath "output"
-Move-Item -Path "output/Install.intunewin" -Destination "output/GoogleChrome.intunewin" -Force
-
-New-IntuneWinPackage -SourcePath "packages/AdobeAcrobatReaderDC" -SetupFile "Install.ps1" -DestinationPath "output"
-Move-Item -Path "output/Install.intunewin" -Destination "output/AdobeAcrobatReaderDC.intunewin" -Force
-
-New-IntuneWinPackage -SourcePath "packages/AdobeAcrobatDC" -SetupFile "Install.ps1" -DestinationPath "output"
-Move-Item -Path "output/Install.intunewin" -Destination "output/AdobeAcrobatDC.intunewin" -Force
+New-IntuneWinPackage -SourcePath "packages/GoogleChrome" -SetupFile "GoogleChrome.txt" -DestinationPath "output"
+New-IntuneWinPackage -SourcePath "packages/AdobeAcrobatReaderDC" -SetupFile "AdobeAcrobatReaderDC.txt" -DestinationPath "output"
+New-IntuneWinPackage -SourcePath "packages/AdobeAcrobatDC" -SetupFile "AdobeAcrobatDC.txt" -DestinationPath "output"
 ```
 
 ### Windows
 ```powershell
-.\IntuneWinAppUtil.exe -c "packages\GoogleChrome" -s "Install.ps1" -o "output" -q
-.\IntuneWinAppUtil.exe -c "packages\AdobeAcrobatReaderDC" -s "Install.ps1" -o "output" -q
-.\IntuneWinAppUtil.exe -c "packages\AdobeAcrobatDC" -s "Install.ps1" -o "output" -q
+.\IntuneWinAppUtil.exe -c "packages\GoogleChrome" -s "GoogleChrome.txt" -o "output" -q
+.\IntuneWinAppUtil.exe -c "packages\AdobeAcrobatReaderDC" -s "AdobeAcrobatReaderDC.txt" -o "output" -q
+.\IntuneWinAppUtil.exe -c "packages\AdobeAcrobatDC" -s "AdobeAcrobatDC.txt" -o "output" -q
 ```
 
 ## Extract .intunewin Package (Optional)
@@ -53,6 +49,7 @@ The `SvRooij.ContentPrep.Cmdlet` module:
 
 1. Create folder under `packages/` with app name
 2. Create these files:
+   - `AppName.txt` - Empty dummy file for naming the .intunewin output
    - `Install.ps1` - Installation script using Evergreen
    - `Uninstall.ps1` - Uninstallation script
    - `Detect.ps1` - Detection script for Intune
@@ -88,4 +85,7 @@ Start-Process -FilePath $Download.FullName -ArgumentList "/silent" -Wait
 Find-EvergreenApp -Name "keyword"
 ```
 
-5. Build the package and add to `output/`
+5. Build the package:
+```powershell
+New-IntuneWinPackage -SourcePath "packages/AppName" -SetupFile "AppName.txt" -DestinationPath "output"
+```
