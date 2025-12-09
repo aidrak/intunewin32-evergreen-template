@@ -56,7 +56,7 @@ The `SvRooij.ContentPrep.Cmdlet` module:
 
 3. Use this Evergreen template for `Install.ps1`:
 ```powershell
-# Trust PSGallery and install/update Evergreen
+# Trust PSGallery and install Evergreen
 if (Get-PSRepository | Where-Object { $_.Name -eq "PSGallery" -and $_.InstallationPolicy -ne "Trusted" }) {
     Install-PackageProvider -Name "NuGet" -MinimumVersion 2.8.5.208 -Force | Out-Null
     Set-PSRepository -Name "PSGallery" -InstallationPolicy "Trusted"
@@ -66,7 +66,9 @@ if (-not (Get-Module -Name Evergreen -ListAvailable)) {
     Install-Module -Name Evergreen -Force -Scope AllUsers
 }
 Import-Module -Name Evergreen -Force
-Update-Module -Name Evergreen -Force -ErrorAction SilentlyContinue
+
+# Download Evergreen app manifests (required for SYSTEM account)
+Update-Evergreen -ErrorAction SilentlyContinue
 
 # Get latest version
 $App = Get-EvergreenApp -Name "YourAppName" |
