@@ -12,5 +12,3 @@ Desktop.ini
 # Tools (downloaded separately)
 tools/
 
-# Built packages (rebuild with New-IntuneWinPackage)
-*.intunewin
