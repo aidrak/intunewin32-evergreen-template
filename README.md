@@ -23,26 +23,37 @@ Deploy Windows applications via Microsoft Intune that **automatically download t
 | **GoogleChrome** | Chrome Enterprise x64 MSI |
 | **AdobeAcrobatReaderDC** | Reader DC x64 MUI |
 | **AdobeAcrobatDC** | Acrobat DC Pro/Standard x64 (requires licensing) |
+| **Microsoft365Apps** | Microsoft 365 Apps via ODT (parameterized - see package README) |
 
 ## Repository Structure
 
 ```
 packages/
 ├── GoogleChrome/
-│   ├── GoogleChrome.txt  # Dummy file for .intunewin naming
-│   ├── Install.ps1       # Downloads & installs latest Chrome
-│   ├── Uninstall.ps1     # Removes Chrome
-│   └── Detect.ps1        # Detection script for Intune
+│   ├── GoogleChrome.txt        # Dummy file for .intunewin naming
+│   ├── GoogleChrome.intunewin  # Built package (upload to Intune)
+│   ├── Install.ps1             # Downloads & installs latest Chrome
+│   ├── Uninstall.ps1           # Removes Chrome
+│   └── Detect.ps1              # Detection script for Intune
 ├── AdobeAcrobatReaderDC/
 │   ├── AdobeAcrobatReaderDC.txt
+│   ├── AdobeAcrobatReaderDC.intunewin
 │   ├── Install.ps1
 │   ├── Uninstall.ps1
 │   └── Detect.ps1
-└── AdobeAcrobatDC/
-    ├── AdobeAcrobatDC.txt
-    ├── Install.ps1
+├── AdobeAcrobatDC/
+│   ├── AdobeAcrobatDC.txt
+│   ├── AdobeAcrobatDC.intunewin
+│   ├── Install.ps1
+│   ├── Uninstall.ps1
+│   └── Detect.ps1
+└── Microsoft365Apps/
+    ├── Microsoft365Apps.txt
+    ├── Microsoft365Apps.intunewin
+    ├── Install.ps1             # Parameterized (see README.md)
     ├── Uninstall.ps1
-    └── Detect.ps1
+    ├── Detect.ps1
+    └── README.md               # Switch documentation
 ```
 
 ## Quick Start

@@ -108,7 +108,7 @@ The included `Detect.ps1` checks for any Microsoft 365 Click-to-Run installation
 
 ```powershell
 pwsh
-New-IntuneWinPackage -SourcePath "packages/Microsoft365Apps" -SetupFile "Microsoft365Apps.txt" -DestinationPath "output"
+New-IntuneWinPackage -SourcePath "packages/Microsoft365Apps" -SetupFile "Microsoft365Apps.txt" -DestinationPath "packages/Microsoft365Apps"
 ```
 
 ---

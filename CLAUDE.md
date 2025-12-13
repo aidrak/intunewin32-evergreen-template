@@ -17,15 +17,16 @@ Install-Module -Name SvRooij.ContentPrep.Cmdlet -Scope CurrentUser -Force
 
 ### Build .intunewin packages
 ```powershell
-# From pwsh shell
-New-IntuneWinPackage -SourcePath "packages/GoogleChrome" -SetupFile "GoogleChrome.txt" -DestinationPath "output"
-New-IntuneWinPackage -SourcePath "packages/AdobeAcrobatReaderDC" -SetupFile "AdobeAcrobatReaderDC.txt" -DestinationPath "output"
-New-IntuneWinPackage -SourcePath "packages/AdobeAcrobatDC" -SetupFile "AdobeAcrobatDC.txt" -DestinationPath "output"
+# From pwsh shell - output goes into same package folder
+New-IntuneWinPackage -SourcePath "packages/GoogleChrome" -SetupFile "GoogleChrome.txt" -DestinationPath "packages/GoogleChrome"
+New-IntuneWinPackage -SourcePath "packages/AdobeAcrobatReaderDC" -SetupFile "AdobeAcrobatReaderDC.txt" -DestinationPath "packages/AdobeAcrobatReaderDC"
+New-IntuneWinPackage -SourcePath "packages/AdobeAcrobatDC" -SetupFile "AdobeAcrobatDC.txt" -DestinationPath "packages/AdobeAcrobatDC"
+New-IntuneWinPackage -SourcePath "packages/Microsoft365Apps" -SetupFile "Microsoft365Apps.txt" -DestinationPath "packages/Microsoft365Apps"
 ```
 
 ### Extract package for inspection
 ```powershell
-Unlock-IntuneWinPackage -SourceFile "output/GoogleChrome.intunewin" -DestinationPath "extracted"
+Unlock-IntuneWinPackage -SourceFile "packages/GoogleChrome/GoogleChrome.intunewin" -DestinationPath "extracted"
 ```
 
 ## Architecture
@@ -66,7 +67,7 @@ Update-Evergreen                            # Download manifests (required for S
 3. Create `Install.ps1` using the Evergreen template from BUILD.md
 4. Create `Uninstall.ps1` for removal
 5. Create `Detect.ps1` returning exit 0 if installed
-6. Build with `New-IntuneWinPackage -SourcePath "packages/NewApp" -SetupFile "NewApp.txt" -DestinationPath "output"`
+6. Build with `New-IntuneWinPackage -SourcePath "packages/NewApp" -SetupFile "NewApp.txt" -DestinationPath "packages/NewApp"`
 
 ## Intune Deployment
 
