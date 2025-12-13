@@ -137,61 +137,132 @@ $ExcludeAppXml
     $Process = Start-Process -FilePath $ODTPath -ArgumentList $InstallArgs -Wait -PassThru -NoNewWindow
 
     if ($Process.ExitCode -eq 0) {
-        Write-Host "Microsoft 365 Apps installed successfully!" -ForegroundColor Green
+        Write-Host "Microsoft 365 Apps installation initiated successfully!" -ForegroundColor Green
 
-        # Create desktop shortcuts on Public Desktop
-        Write-Host "Creating desktop shortcuts..." -ForegroundColor Yellow
-        $PublicDesktop = "$env:PUBLIC\Desktop"
-        $OfficeRoot = "$env:ProgramFiles\Microsoft Office\root\Office16"
-        $WshShell = New-Object -ComObject WScript.Shell
+        # Create scheduled task to create shortcuts after Office finishes installing
+        Write-Host "Creating scheduled task for desktop shortcuts..." -ForegroundColor Yellow
 
-        # Define apps and their executables (all always included now)
-        $OfficeApps = @{
-            "Word"       = "WINWORD.EXE"
-            "Excel"      = "EXCEL.EXE"
-            "PowerPoint" = "POWERPNT.EXE"
-            "OneNote"    = "ONENOTE.EXE"
-            "Outlook"    = "OUTLOOK.EXE"
-            "Access"     = "MSACCESS.EXE"
-            "Publisher"  = "MSPUB.EXE"
-        }
+        $TaskName = "M365Apps-CreateShortcuts"
+        $ScriptPath = "C:\ProgramData\Intune\Scripts\M365Apps-CreateShortcuts.ps1"
+        $ScriptDir = Split-Path $ScriptPath -Parent
 
-        foreach ($App in $OfficeApps.GetEnumerator()) {
-            $ExePath = Join-Path $OfficeRoot $App.Value
-            if (Test-Path $ExePath) {
-                $ShortcutPath = Join-Path $PublicDesktop "$($App.Key).lnk"
-                $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
-                $Shortcut.TargetPath = $ExePath
-                $Shortcut.WorkingDirectory = $OfficeRoot
-                $Shortcut.Save()
-                Write-Host "  Created: $($App.Key).lnk" -ForegroundColor Green
-            }
-        }
+        # Create script directory
+        New-Item -ItemType Directory -Path $ScriptDir -Force | Out-Null
 
-        # Handle OneDrive shortcut if included
-        if ($IncludeOneDrive) {
-            $OneDriveExe = "$env:ProgramFiles\Microsoft OneDrive\OneDrive.exe"
-            if (Test-Path $OneDriveExe) {
-                $ShortcutPath = Join-Path $PublicDesktop "OneDrive.lnk"
-                $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
-                $Shortcut.TargetPath = $OneDriveExe
-                $Shortcut.Save()
-                Write-Host "  Created: OneDrive.lnk" -ForegroundColor Green
-            }
-        }
+        # Build shortcut script with current parameters embedded
+        $ShortcutScript = @"
+# M365Apps-CreateShortcuts.ps1 - One-shot scheduled task script
+`$LogFile = "C:\ProgramData\Intune\Logs\M365Apps-Shortcuts.log"
+`$TaskName = "M365Apps-CreateShortcuts"
+`$MaxAttempts = 60  # 60 attempts x 60 seconds = 60 minutes max wait
+`$AttemptDelay = 60  # seconds
 
-        # Handle Teams shortcut if included (different install location)
-        if ($IncludeTeams) {
-            $TeamsExe = "$env:ProgramFiles\WindowsApps\MSTeams_*\ms-teams.exe"
-            $TeamsPath = Get-Item $TeamsExe -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($TeamsPath) {
-                $ShortcutPath = Join-Path $PublicDesktop "Microsoft Teams.lnk"
-                $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
-                $Shortcut.TargetPath = $TeamsPath.FullName
-                $Shortcut.Save()
-                Write-Host "  Created: Microsoft Teams.lnk" -ForegroundColor Green
-            }
-        }
+function Write-Log {
+    param([string]`$Message)
+    `$Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    Add-Content -Path `$LogFile -Value "[`$Timestamp] `$Message" -ErrorAction SilentlyContinue
+}
+
+Write-Log "Shortcut creation task started"
+
+`$OfficeRoot = "`$env:ProgramFiles\Microsoft Office\root\Office16"
+`$WordExe = Join-Path `$OfficeRoot "WINWORD.EXE"
+
+# Wait for Office to finish installing
+`$Attempt = 0
+while (-not (Test-Path `$WordExe) -and `$Attempt -lt `$MaxAttempts) {
+    `$Attempt++
+    Write-Log "Waiting for Office installation (attempt `$Attempt/`$MaxAttempts)..."
+    Start-Sleep -Seconds `$AttemptDelay
+}
+
+if (-not (Test-Path `$WordExe)) {
+    Write-Log "ERROR: Office installation not detected after `$MaxAttempts attempts. Exiting."
+    Unregister-ScheduledTask -TaskName `$TaskName -Confirm:`$false -ErrorAction SilentlyContinue
+    exit 1
+}
+
+Write-Log "Office installation detected. Creating shortcuts..."
+
+`$PublicDesktop = "`$env:PUBLIC\Desktop"
+`$WshShell = New-Object -ComObject WScript.Shell
+
+# Core Office apps
+`$OfficeApps = @{
+    "Word"       = "WINWORD.EXE"
+    "Excel"      = "EXCEL.EXE"
+    "PowerPoint" = "POWERPNT.EXE"
+    "OneNote"    = "ONENOTE.EXE"
+    "Outlook"    = "OUTLOOK.EXE"
+    "Access"     = "MSACCESS.EXE"
+    "Publisher"  = "MSPUB.EXE"
+}
+
+foreach (`$App in `$OfficeApps.GetEnumerator()) {
+    `$ExePath = Join-Path `$OfficeRoot `$App.Value
+    if (Test-Path `$ExePath) {
+        `$ShortcutPath = Join-Path `$PublicDesktop "`$(`$App.Key).lnk"
+        `$Shortcut = `$WshShell.CreateShortcut(`$ShortcutPath)
+        `$Shortcut.TargetPath = `$ExePath
+        `$Shortcut.WorkingDirectory = `$OfficeRoot
+        `$Shortcut.Save()
+        Write-Log "Created: `$(`$App.Key).lnk"
+    }
+}
+
+# OneDrive (if installed)
+`$IncludeOneDrive = `$$($IncludeOneDrive.ToString().ToLower())
+if (`$IncludeOneDrive) {
+    `$OneDriveExe = "`$env:ProgramFiles\Microsoft OneDrive\OneDrive.exe"
+    if (Test-Path `$OneDriveExe) {
+        `$ShortcutPath = Join-Path `$PublicDesktop "OneDrive.lnk"
+        `$Shortcut = `$WshShell.CreateShortcut(`$ShortcutPath)
+        `$Shortcut.TargetPath = `$OneDriveExe
+        `$Shortcut.Save()
+        Write-Log "Created: OneDrive.lnk"
+    }
+}
+
+# Teams (if installed)
+`$IncludeTeams = `$$($IncludeTeams.ToString().ToLower())
+if (`$IncludeTeams) {
+    `$TeamsExe = "`$env:ProgramFiles\WindowsApps\MSTeams_*\ms-teams.exe"
+    `$TeamsPath = Get-Item `$TeamsExe -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (`$TeamsPath) {
+        `$ShortcutPath = Join-Path `$PublicDesktop "Microsoft Teams.lnk"
+        `$Shortcut = `$WshShell.CreateShortcut(`$ShortcutPath)
+        `$Shortcut.TargetPath = `$TeamsPath.FullName
+        `$Shortcut.Save()
+        Write-Log "Created: Microsoft Teams.lnk"
+    }
+}
+
+Write-Log "Shortcut creation complete. Removing scheduled task."
+
+# Clean up - remove the scheduled task and script
+Unregister-ScheduledTask -TaskName `$TaskName -Confirm:`$false -ErrorAction SilentlyContinue
+Remove-Item -Path `$MyInvocation.MyCommand.Path -Force -ErrorAction SilentlyContinue
+"@
+
+        # Save the script
+        $ShortcutScript | Out-File -FilePath $ScriptPath -Encoding UTF8 -Force
+        Write-Host "  Shortcut script saved to: $ScriptPath" -ForegroundColor Green
+
+        # Create scheduled task - runs at startup with 2 minute delay
+        $Action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$ScriptPath`""
+        $Trigger = New-ScheduledTaskTrigger -AtStartup
+        $Trigger.Delay = "PT2M"  # 2 minute delay after startup
+        $Principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -RunLevel Highest -LogonType ServiceAccount
+        $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+
+        # Remove existing task if present
+        Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
+
+        # Register the task
+        Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Principal $Principal -Settings $Settings -Description "Creates Microsoft 365 Apps desktop shortcuts after installation completes" | Out-Null
+        Write-Host "  Scheduled task '$TaskName' created" -ForegroundColor Green
+        Write-Host "  Shortcuts will be created after next reboot (or when Office install completes)" -ForegroundColor Yellow
+
     } else {
         Write-Host "Installation completed with exit code: $($Process.ExitCode)" -ForegroundColor Yellow
     }
