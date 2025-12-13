@@ -1,0 +1,2 @@
+Dummy file for .intunewin package naming.
+See README.md for deployment options.
