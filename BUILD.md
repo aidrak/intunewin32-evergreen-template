@@ -19,23 +19,25 @@ Each package folder contains a dummy `.txt` file (e.g., `GoogleChrome.txt`) used
 
 ### Linux/macOS
 ```powershell
-New-IntuneWinPackage -SourcePath "packages/GoogleChrome" -SetupFile "GoogleChrome.txt" -DestinationPath "output"
-New-IntuneWinPackage -SourcePath "packages/AdobeAcrobatReaderDC" -SetupFile "AdobeAcrobatReaderDC.txt" -DestinationPath "output"
-New-IntuneWinPackage -SourcePath "packages/AdobeAcrobatDC" -SetupFile "AdobeAcrobatDC.txt" -DestinationPath "output"
+New-IntuneWinPackage -SourcePath "packages/GoogleChrome" -SetupFile "GoogleChrome.txt" -DestinationPath "packages/GoogleChrome"
+New-IntuneWinPackage -SourcePath "packages/AdobeAcrobatReaderDC" -SetupFile "AdobeAcrobatReaderDC.txt" -DestinationPath "packages/AdobeAcrobatReaderDC"
+New-IntuneWinPackage -SourcePath "packages/AdobeAcrobatDC" -SetupFile "AdobeAcrobatDC.txt" -DestinationPath "packages/AdobeAcrobatDC"
+New-IntuneWinPackage -SourcePath "packages/Microsoft365Apps" -SetupFile "Microsoft365Apps.txt" -DestinationPath "packages/Microsoft365Apps"
 ```
 
 ### Windows
 ```powershell
-.\IntuneWinAppUtil.exe -c "packages\GoogleChrome" -s "GoogleChrome.txt" -o "output" -q
-.\IntuneWinAppUtil.exe -c "packages\AdobeAcrobatReaderDC" -s "AdobeAcrobatReaderDC.txt" -o "output" -q
-.\IntuneWinAppUtil.exe -c "packages\AdobeAcrobatDC" -s "AdobeAcrobatDC.txt" -o "output" -q
+.\IntuneWinAppUtil.exe -c "packages\GoogleChrome" -s "GoogleChrome.txt" -o "packages\GoogleChrome" -q
+.\IntuneWinAppUtil.exe -c "packages\AdobeAcrobatReaderDC" -s "AdobeAcrobatReaderDC.txt" -o "packages\AdobeAcrobatReaderDC" -q
+.\IntuneWinAppUtil.exe -c "packages\AdobeAcrobatDC" -s "AdobeAcrobatDC.txt" -o "packages\AdobeAcrobatDC" -q
+.\IntuneWinAppUtil.exe -c "packages\Microsoft365Apps" -s "Microsoft365Apps.txt" -o "packages\Microsoft365Apps" -q
 ```
 
 ## Extract .intunewin Package (Optional)
 
 To inspect package contents:
 ```powershell
-Unlock-IntuneWinPackage -SourceFile "output/GoogleChrome.intunewin" -DestinationPath "extracted"
+Unlock-IntuneWinPackage -SourceFile "packages/GoogleChrome/GoogleChrome.intunewin" -DestinationPath "extracted"
 ```
 
 ## Cross-Platform Module Notes
@@ -107,5 +109,5 @@ Find-EvergreenApp -Name "keyword"
 
 5. Build the package:
 ```powershell
-New-IntuneWinPackage -SourcePath "packages/AppName" -SetupFile "AppName.txt" -DestinationPath "output"
+New-IntuneWinPackage -SourcePath "packages/AppName" -SetupFile "AppName.txt" -DestinationPath "packages/AppName"
 ```
