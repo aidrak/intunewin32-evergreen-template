@@ -5,54 +5,39 @@
 
 .DESCRIPTION
     Downloads ODT via Evergreen and installs Microsoft 365 Apps with dynamic configuration.
-    Default: Minimal install (Word, Excel, PowerPoint, OneNote) with Shared Computer Licensing.
+    Default: Full suite (Word, Excel, PowerPoint, OneNote, Outlook, Access, Publisher)
+    without Shared Computer Licensing. Desktop shortcuts always published to Public Desktop.
 
 .PARAMETER IncludeTeams
     Include Microsoft Teams (uses O365ProPlusRetail SKU instead of EEA NoTeams SKU)
 
-.PARAMETER IncludeOutlook
-    Include classic Outlook
-
-.PARAMETER IncludeOutlookNew
-    Include new Outlook for Windows
-
 .PARAMETER IncludeOneDrive
     Include OneDrive sync client
 
-.PARAMETER IncludeAccess
-    Include Microsoft Access
-
-.PARAMETER IncludePublisher
-    Include Microsoft Publisher
-
-.PARAMETER NoSharedComputer
-    Disable Shared Computer Licensing (for non-VDI/single-user scenarios)
-
-.PARAMETER PublishDesktopShortcuts
-    Create shortcuts on the Public Desktop for installed Office apps
+.PARAMETER SetSharedActivation
+    Enable Shared Computer Licensing (for VDI/RDS/multi-user scenarios)
 
 .EXAMPLE
-    # Minimal install (default)
+    # Standard workstation (default)
     .\Install.ps1
 
 .EXAMPLE
-    # Full suite with Teams
-    .\Install.ps1 -IncludeTeams -IncludeOutlook -IncludeOneDrive
+    # With Teams and OneDrive
+    .\Install.ps1 -IncludeTeams -IncludeOneDrive
 
 .EXAMPLE
-    # Standard workstation (not VDI)
-    .\Install.ps1 -IncludeOutlook -IncludeOneDrive -NoSharedComputer
+    # VDI/RDS environment with shared licensing
+    .\Install.ps1 -SetSharedActivation
+
+.EXAMPLE
+    # Full suite for VDI with Teams
+    .\Install.ps1 -IncludeTeams -IncludeOneDrive -SetSharedActivation
 #>
 
 param(
     [switch]$IncludeTeams,
-    [switch]$IncludeOutlook,
-    [switch]$IncludeOutlookNew,
     [switch]$IncludeOneDrive,
-    [switch]$IncludeAccess,
-    [switch]$IncludePublisher,
-    [switch]$NoSharedComputer,
-    [switch]$PublishDesktopShortcuts
+    [switch]$SetSharedActivation
 )
 
 $AppName = "Microsoft365Apps"
@@ -73,13 +58,8 @@ try {
     Write-Host ""
     Write-Host "Configuration:"
     Write-Host "  IncludeTeams: $IncludeTeams"
-    Write-Host "  IncludeOutlook: $IncludeOutlook"
-    Write-Host "  IncludeOutlookNew: $IncludeOutlookNew"
     Write-Host "  IncludeOneDrive: $IncludeOneDrive"
-    Write-Host "  IncludeAccess: $IncludeAccess"
-    Write-Host "  IncludePublisher: $IncludePublisher"
-    Write-Host "  SharedComputerLicensing: $(-not $NoSharedComputer)"
-    Write-Host "  PublishDesktopShortcuts: $PublishDesktopShortcuts"
+    Write-Host "  SharedComputerLicensing: $SetSharedActivation"
     Write-Host ""
 
     # Install Evergreen module
@@ -106,11 +86,7 @@ try {
     # Build ExcludeApp list
     $ExcludeApps = @("Lync", "Groove")  # Always exclude Skype for Business and Groove
 
-    if (-not $IncludeOutlook) { $ExcludeApps += "Outlook" }
-    if (-not $IncludeOutlookNew) { $ExcludeApps += "OutlookForWindows" }
     if (-not $IncludeOneDrive) { $ExcludeApps += "OneDrive" }
-    if (-not $IncludeAccess) { $ExcludeApps += "Access" }
-    if (-not $IncludePublisher) { $ExcludeApps += "Publisher" }
 
     # Build ExcludeApp XML elements
     $ExcludeAppXml = ($ExcludeApps | ForEach-Object { "      <ExcludeApp ID=`"$_`" />" }) -join "`n"
@@ -119,7 +95,7 @@ try {
     $ProductID = if ($IncludeTeams) { "O365ProPlusRetail" } else { "O365ProPlusEEANoTeamsRetail" }
 
     # Shared Computer Licensing
-    $SharedComputerValue = if ($NoSharedComputer) { "0" } else { "1" }
+    $SharedComputerValue = if ($SetSharedActivation) { "1" } else { "0" }
 
     # Generate configuration XML
     $ConfigXml = @"
@@ -163,47 +139,57 @@ $ExcludeAppXml
     if ($Process.ExitCode -eq 0) {
         Write-Host "Microsoft 365 Apps installed successfully!" -ForegroundColor Green
 
-        # Create desktop shortcuts if requested
-        if ($PublishDesktopShortcuts) {
-            Write-Host "Creating desktop shortcuts..." -ForegroundColor Yellow
-            $PublicDesktop = "$env:PUBLIC\Desktop"
-            $OfficeRoot = "$env:ProgramFiles\Microsoft Office\root\Office16"
-            $WshShell = New-Object -ComObject WScript.Shell
+        # Create desktop shortcuts on Public Desktop
+        Write-Host "Creating desktop shortcuts..." -ForegroundColor Yellow
+        $PublicDesktop = "$env:PUBLIC\Desktop"
+        $OfficeRoot = "$env:ProgramFiles\Microsoft Office\root\Office16"
+        $WshShell = New-Object -ComObject WScript.Shell
 
-            # Define apps and their executables
-            $OfficeApps = @{
-                "Word"       = @{ Exe = "WINWORD.EXE"; Include = $true }
-                "Excel"      = @{ Exe = "EXCEL.EXE"; Include = $true }
-                "PowerPoint" = @{ Exe = "POWERPNT.EXE"; Include = $true }
-                "OneNote"    = @{ Exe = "ONENOTE.EXE"; Include = $true }
-                "Outlook"    = @{ Exe = "OUTLOOK.EXE"; Include = $IncludeOutlook }
-                "Access"     = @{ Exe = "MSACCESS.EXE"; Include = $IncludeAccess }
-                "Publisher"  = @{ Exe = "MSPUB.EXE"; Include = $IncludePublisher }
+        # Define apps and their executables (all always included now)
+        $OfficeApps = @{
+            "Word"       = "WINWORD.EXE"
+            "Excel"      = "EXCEL.EXE"
+            "PowerPoint" = "POWERPNT.EXE"
+            "OneNote"    = "ONENOTE.EXE"
+            "Outlook"    = "OUTLOOK.EXE"
+            "Access"     = "MSACCESS.EXE"
+            "Publisher"  = "MSPUB.EXE"
+        }
+
+        foreach ($App in $OfficeApps.GetEnumerator()) {
+            $ExePath = Join-Path $OfficeRoot $App.Value
+            if (Test-Path $ExePath) {
+                $ShortcutPath = Join-Path $PublicDesktop "$($App.Key).lnk"
+                $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
+                $Shortcut.TargetPath = $ExePath
+                $Shortcut.WorkingDirectory = $OfficeRoot
+                $Shortcut.Save()
+                Write-Host "  Created: $($App.Key).lnk" -ForegroundColor Green
             }
+        }
 
-            foreach ($App in $OfficeApps.GetEnumerator()) {
-                $ExePath = Join-Path $OfficeRoot $App.Value.Exe
-                if ($App.Value.Include -and (Test-Path $ExePath)) {
-                    $ShortcutPath = Join-Path $PublicDesktop "$($App.Key).lnk"
-                    $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
-                    $Shortcut.TargetPath = $ExePath
-                    $Shortcut.WorkingDirectory = $OfficeRoot
-                    $Shortcut.Save()
-                    Write-Host "  Created: $($App.Key).lnk" -ForegroundColor Green
-                }
+        # Handle OneDrive shortcut if included
+        if ($IncludeOneDrive) {
+            $OneDriveExe = "$env:ProgramFiles\Microsoft OneDrive\OneDrive.exe"
+            if (Test-Path $OneDriveExe) {
+                $ShortcutPath = Join-Path $PublicDesktop "OneDrive.lnk"
+                $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
+                $Shortcut.TargetPath = $OneDriveExe
+                $Shortcut.Save()
+                Write-Host "  Created: OneDrive.lnk" -ForegroundColor Green
             }
+        }
 
-            # Handle Teams separately (different install location)
-            if ($IncludeTeams) {
-                $TeamsExe = "$env:ProgramFiles\WindowsApps\MSTeams_*\ms-teams.exe"
-                $TeamsPath = Get-Item $TeamsExe -ErrorAction SilentlyContinue | Select-Object -First 1
-                if ($TeamsPath) {
-                    $ShortcutPath = Join-Path $PublicDesktop "Microsoft Teams.lnk"
-                    $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
-                    $Shortcut.TargetPath = $TeamsPath.FullName
-                    $Shortcut.Save()
-                    Write-Host "  Created: Microsoft Teams.lnk" -ForegroundColor Green
-                }
+        # Handle Teams shortcut if included (different install location)
+        if ($IncludeTeams) {
+            $TeamsExe = "$env:ProgramFiles\WindowsApps\MSTeams_*\ms-teams.exe"
+            $TeamsPath = Get-Item $TeamsExe -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($TeamsPath) {
+                $ShortcutPath = Join-Path $PublicDesktop "Microsoft Teams.lnk"
+                $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
+                $Shortcut.TargetPath = $TeamsPath.FullName
+                $Shortcut.Save()
+                Write-Host "  Created: Microsoft Teams.lnk" -ForegroundColor Green
             }
         }
     } else {
