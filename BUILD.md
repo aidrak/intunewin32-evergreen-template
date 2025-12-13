@@ -56,6 +56,16 @@ The `SvRooij.ContentPrep.Cmdlet` module:
 
 3. Use this Evergreen template for `Install.ps1`:
 ```powershell
+$AppName = "YourAppName"
+$BasePath = "C:\ProgramData\Intune"
+$LogPath = Join-Path -Path $BasePath -ChildPath "Logs"
+$LogFile = Join-Path -Path $LogPath -ChildPath "$AppName-Install.log"
+$TempPath = Join-Path -Path $BasePath -ChildPath "Downloads\$AppName"
+
+# Create directories
+if (-not (Test-Path $LogPath)) { New-Item -Path $LogPath -ItemType Directory -Force | Out-Null }
+if (-not (Test-Path $TempPath)) { New-Item -Path $TempPath -ItemType Directory -Force | Out-Null }
+
 # Trust PSGallery and install Evergreen
 if (Get-PSRepository | Where-Object { $_.Name -eq "PSGallery" -and $_.InstallationPolicy -ne "Trusted" }) {
     Install-PackageProvider -Name "NuGet" -MinimumVersion 2.8.5.208 -Force | Out-Null
@@ -76,11 +86,19 @@ $App = Get-EvergreenApp -Name "YourAppName" |
     Select-Object -First 1
 
 # Download using Save-EvergreenApp
-$Download = $App | Save-EvergreenApp -Path $env:TEMP
+$Download = $App | Save-EvergreenApp -Path $TempPath
 
 # Install
 Start-Process -FilePath $Download.FullName -ArgumentList "/silent" -Wait
+
+# Cleanup
+Remove-Item -Path $TempPath -Recurse -Force -ErrorAction SilentlyContinue
 ```
+
+### Standard Paths
+All scripts use `C:\ProgramData\Intune\` as the base directory:
+- **Logs:** `C:\ProgramData\Intune\Logs\`
+- **Downloads:** `C:\ProgramData\Intune\Downloads\{AppName}\` (cleaned up after install)
 
 4. Find available Evergreen apps:
 ```powershell

@@ -44,7 +44,12 @@ All Install.ps1 scripts follow this flow:
 3. Query `Get-EvergreenApp` with filters (architecture, channel, type, language)
 4. Download via `Save-EvergreenApp -Path $TempPath`
 5. Silent install with `ALLUSERS=1` for VDI/multi-user support
-6. Log to `C:\ProgramData\Microsoft\IntuneManagementExtension\Logs\{AppName}-Install.log`
+6. Log to `C:\ProgramData\Intune\Logs\{AppName}-Install.log`
+
+### Standard Paths
+All scripts use `C:\ProgramData\Intune\` as the base directory:
+- **Logs:** `C:\ProgramData\Intune\Logs\` - Installation and MSI logs
+- **Downloads:** `C:\ProgramData\Intune\Downloads\{AppName}\` - Temporary installer downloads (cleaned up after install)
 
 ### Key Evergreen Commands
 ```powershell

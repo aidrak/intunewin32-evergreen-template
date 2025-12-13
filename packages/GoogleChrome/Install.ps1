@@ -15,9 +15,10 @@
 param()
 
 $AppName = "GoogleChrome"
-$LogPath = "C:\ProgramData\Microsoft\IntuneManagementExtension\Logs"
+$BasePath = "C:\ProgramData\Intune"
+$LogPath = Join-Path -Path $BasePath -ChildPath "Logs"
 $LogFile = Join-Path -Path $LogPath -ChildPath "$AppName-Install.log"
-$TempPath = Join-Path -Path $env:TEMP -ChildPath $AppName
+$TempPath = Join-Path -Path $BasePath -ChildPath "Downloads\$AppName"
 
 function Write-Log {
     param([string]$Message)
