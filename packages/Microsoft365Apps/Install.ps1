@@ -28,6 +28,9 @@
 .PARAMETER NoSharedComputer
     Disable Shared Computer Licensing (for non-VDI/single-user scenarios)
 
+.PARAMETER PublishDesktopShortcuts
+    Create shortcuts on the Public Desktop for installed Office apps
+
 .EXAMPLE
     # Minimal install (default)
     .\Install.ps1
@@ -48,7 +51,8 @@ param(
     [switch]$IncludeOneDrive,
     [switch]$IncludeAccess,
     [switch]$IncludePublisher,
-    [switch]$NoSharedComputer
+    [switch]$NoSharedComputer,
+    [switch]$PublishDesktopShortcuts
 )
 
 $AppName = "Microsoft365Apps"
@@ -75,6 +79,7 @@ try {
     Write-Host "  IncludeAccess: $IncludeAccess"
     Write-Host "  IncludePublisher: $IncludePublisher"
     Write-Host "  SharedComputerLicensing: $(-not $NoSharedComputer)"
+    Write-Host "  PublishDesktopShortcuts: $PublishDesktopShortcuts"
     Write-Host ""
 
     # Install Evergreen module
@@ -157,6 +162,50 @@ $ExcludeAppXml
 
     if ($Process.ExitCode -eq 0) {
         Write-Host "Microsoft 365 Apps installed successfully!" -ForegroundColor Green
+
+        # Create desktop shortcuts if requested
+        if ($PublishDesktopShortcuts) {
+            Write-Host "Creating desktop shortcuts..." -ForegroundColor Yellow
+            $PublicDesktop = "$env:PUBLIC\Desktop"
+            $OfficeRoot = "$env:ProgramFiles\Microsoft Office\root\Office16"
+            $WshShell = New-Object -ComObject WScript.Shell
+
+            # Define apps and their executables
+            $OfficeApps = @{
+                "Word"       = @{ Exe = "WINWORD.EXE"; Include = $true }
+                "Excel"      = @{ Exe = "EXCEL.EXE"; Include = $true }
+                "PowerPoint" = @{ Exe = "POWERPNT.EXE"; Include = $true }
+                "OneNote"    = @{ Exe = "ONENOTE.EXE"; Include = $true }
+                "Outlook"    = @{ Exe = "OUTLOOK.EXE"; Include = $IncludeOutlook }
+                "Access"     = @{ Exe = "MSACCESS.EXE"; Include = $IncludeAccess }
+                "Publisher"  = @{ Exe = "MSPUB.EXE"; Include = $IncludePublisher }
+            }
+
+            foreach ($App in $OfficeApps.GetEnumerator()) {
+                $ExePath = Join-Path $OfficeRoot $App.Value.Exe
+                if ($App.Value.Include -and (Test-Path $ExePath)) {
+                    $ShortcutPath = Join-Path $PublicDesktop "$($App.Key).lnk"
+                    $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
+                    $Shortcut.TargetPath = $ExePath
+                    $Shortcut.WorkingDirectory = $OfficeRoot
+                    $Shortcut.Save()
+                    Write-Host "  Created: $($App.Key).lnk" -ForegroundColor Green
+                }
+            }
+
+            # Handle Teams separately (different install location)
+            if ($IncludeTeams) {
+                $TeamsExe = "$env:ProgramFiles\WindowsApps\MSTeams_*\ms-teams.exe"
+                $TeamsPath = Get-Item $TeamsExe -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($TeamsPath) {
+                    $ShortcutPath = Join-Path $PublicDesktop "Microsoft Teams.lnk"
+                    $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
+                    $Shortcut.TargetPath = $TeamsPath.FullName
+                    $Shortcut.Save()
+                    Write-Host "  Created: Microsoft Teams.lnk" -ForegroundColor Green
+                }
+            }
+        }
     } else {
         Write-Host "Installation completed with exit code: $($Process.ExitCode)" -ForegroundColor Yellow
     }

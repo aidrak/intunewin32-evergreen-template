@@ -44,6 +44,7 @@ Deploys Microsoft 365 Apps using the Office Deployment Tool (ODT) with configura
 | `-IncludeAccess` | Add Microsoft Access |
 | `-IncludePublisher` | Add Microsoft Publisher |
 | `-NoSharedComputer` | Disable Shared Computer Licensing |
+| `-PublishDesktopShortcuts` | Create shortcuts on Public Desktop for installed apps |
 
 ---
 
@@ -77,10 +78,10 @@ Install behavior:  System
 ```
 
 ### VDI/RDS Environment
-Minimal apps with shared licensing (default), add Outlook for email.
+Minimal apps with shared licensing (default), add Outlook for email, publish shortcuts.
 
 ```
-Install command:   powershell.exe -ExecutionPolicy Bypass -File .\Install.ps1 -IncludeOutlook
+Install command:   powershell.exe -ExecutionPolicy Bypass -File .\Install.ps1 -IncludeOutlook -PublishDesktopShortcuts
 Uninstall command: powershell.exe -ExecutionPolicy Bypass -File .\Uninstall.ps1
 Install behavior:  System
 ```
