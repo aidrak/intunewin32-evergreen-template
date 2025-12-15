@@ -12,7 +12,7 @@ Pre-built packages that automatically install the latest version from the vendor
 
 ## Step 1: Download
 
-Download the `.intunewin` file from the `output/` folder.
+Download the `.intunewin` file from the respective `packages/AppName/` folder.
 
 ## Step 2: Upload to Intune
 
