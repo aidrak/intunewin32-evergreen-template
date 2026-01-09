@@ -12,3 +12,6 @@ Desktop.ini
 # Tools (downloaded separately)
 tools/
 
+# Installer binaries (download separately, not stored in repo)
+*.msi
+
