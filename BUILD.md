@@ -18,11 +18,19 @@ Download [IntuneWinAppUtil.exe](https://github.com/microsoft/Microsoft-Win32-Con
 Each package folder contains a dummy `.txt` file (e.g., `GoogleChrome.txt`) used to name the output `.intunewin` file. Point the build command at this file.
 
 ### Linux/macOS
-```powershell
-New-IntuneWinPackage -SourcePath "packages/GoogleChrome" -SetupFile "GoogleChrome.txt" -DestinationPath "packages/GoogleChrome"
-New-IntuneWinPackage -SourcePath "packages/AdobeAcrobatReaderDC" -SetupFile "AdobeAcrobatReaderDC.txt" -DestinationPath "packages/AdobeAcrobatReaderDC"
-New-IntuneWinPackage -SourcePath "packages/AdobeAcrobatDC" -SetupFile "AdobeAcrobatDC.txt" -DestinationPath "packages/AdobeAcrobatDC"
-New-IntuneWinPackage -SourcePath "packages/Microsoft365Apps" -SetupFile "Microsoft365Apps.txt" -DestinationPath "packages/Microsoft365Apps"
+
+**Note:** The `SvRooij.ContentPrep.Cmdlet` module does not allow DestinationPath to be a subfolder of SourcePath. Use `/tmp` as an intermediate destination, then move the file:
+
+```bash
+# Generic pattern
+pwsh -Command "New-IntuneWinPackage -SourcePath 'packages/APPNAME' -SetupFile 'APPNAME.txt' -DestinationPath '/tmp'" && mv /tmp/APPNAME.intunewin packages/APPNAME/
+
+# Examples
+pwsh -Command "New-IntuneWinPackage -SourcePath 'packages/GoogleChrome' -SetupFile 'GoogleChrome.txt' -DestinationPath '/tmp'" && mv /tmp/GoogleChrome.intunewin packages/GoogleChrome/
+pwsh -Command "New-IntuneWinPackage -SourcePath 'packages/AdobeAcrobatReaderDC' -SetupFile 'AdobeAcrobatReaderDC.txt' -DestinationPath '/tmp'" && mv /tmp/AdobeAcrobatReaderDC.intunewin packages/AdobeAcrobatReaderDC/
+pwsh -Command "New-IntuneWinPackage -SourcePath 'packages/AdobeAcrobatDC' -SetupFile 'AdobeAcrobatDC.txt' -DestinationPath '/tmp'" && mv /tmp/AdobeAcrobatDC.intunewin packages/AdobeAcrobatDC/
+pwsh -Command "New-IntuneWinPackage -SourcePath 'packages/Microsoft365Apps' -SetupFile 'Microsoft365Apps.txt' -DestinationPath '/tmp'" && mv /tmp/Microsoft365Apps.intunewin packages/Microsoft365Apps/
+pwsh -Command "New-IntuneWinPackage -SourcePath 'packages/SentinelOne' -SetupFile 'SentinelOne.txt' -DestinationPath '/tmp'" && mv /tmp/SentinelOne.intunewin packages/SentinelOne/
 ```
 
 ### Windows
@@ -31,6 +39,7 @@ New-IntuneWinPackage -SourcePath "packages/Microsoft365Apps" -SetupFile "Microso
 .\IntuneWinAppUtil.exe -c "packages\AdobeAcrobatReaderDC" -s "AdobeAcrobatReaderDC.txt" -o "packages\AdobeAcrobatReaderDC" -q
 .\IntuneWinAppUtil.exe -c "packages\AdobeAcrobatDC" -s "AdobeAcrobatDC.txt" -o "packages\AdobeAcrobatDC" -q
 .\IntuneWinAppUtil.exe -c "packages\Microsoft365Apps" -s "Microsoft365Apps.txt" -o "packages\Microsoft365Apps" -q
+.\IntuneWinAppUtil.exe -c "packages\SentinelOne" -s "SentinelOne.txt" -o "packages\SentinelOne" -q
 ```
 
 ## Extract .intunewin Package (Optional)
@@ -108,6 +117,10 @@ Find-EvergreenApp -Name "keyword"
 ```
 
 5. Build the package:
-```powershell
-New-IntuneWinPackage -SourcePath "packages/AppName" -SetupFile "AppName.txt" -DestinationPath "packages/AppName"
+```bash
+# Linux/macOS
+pwsh -Command "New-IntuneWinPackage -SourcePath 'packages/AppName' -SetupFile 'AppName.txt' -DestinationPath '/tmp'" && mv /tmp/AppName.intunewin packages/AppName/
+
+# Windows
+.\IntuneWinAppUtil.exe -c "packages\AppName" -s "AppName.txt" -o "packages\AppName" -q
 ```
