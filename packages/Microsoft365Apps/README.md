@@ -14,7 +14,7 @@ Deploys Microsoft 365 Apps using the Office Deployment Tool (ODT) with configura
 
 ### Apps Always Included
 - Word, Excel, PowerPoint, OneNote
-- Outlook (classic + new)
+- Outlook (classic + new) - use `-ExcludeNewOutlook` to install only classic Outlook
 - Access, Publisher
 
 ### Apps Excluded by Default
@@ -55,6 +55,7 @@ Deploys Microsoft 365 Apps using the Office Deployment Tool (ODT) with configura
 | `-IncludeTeams` | Add Microsoft Teams (switches to O365ProPlusRetail SKU) |
 | `-IncludeOneDrive` | Add OneDrive sync client |
 | `-SetSharedActivation` | Enable Shared Computer Licensing (for VDI/RDS) |
+| `-ExcludeNewOutlook` | Exclude new Outlook app (classic Outlook only) |
 
 ---
 
@@ -78,6 +79,11 @@ powershell.exe -ExecutionPolicy Bypass -File .\Install.ps1 -SetSharedActivation
 **Full Suite for VDI with Teams**
 ```
 powershell.exe -ExecutionPolicy Bypass -File .\Install.ps1 -IncludeTeams -IncludeOneDrive -SetSharedActivation
+```
+
+**Classic Outlook Only (No New Outlook)**
+```
+powershell.exe -ExecutionPolicy Bypass -File .\Install.ps1 -ExcludeNewOutlook
 ```
 
 ---

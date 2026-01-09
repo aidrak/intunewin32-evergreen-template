@@ -17,6 +17,9 @@
 .PARAMETER SetSharedActivation
     Enable Shared Computer Licensing (for VDI/RDS/multi-user scenarios)
 
+.PARAMETER ExcludeNewOutlook
+    Exclude the new Outlook app (installs only classic Outlook)
+
 .EXAMPLE
     # Standard workstation (default)
     .\Install.ps1
@@ -37,7 +40,8 @@
 param(
     [switch]$IncludeTeams,
     [switch]$IncludeOneDrive,
-    [switch]$SetSharedActivation
+    [switch]$SetSharedActivation,
+    [switch]$ExcludeNewOutlook
 )
 
 $AppName = "Microsoft365Apps"
@@ -60,6 +64,7 @@ try {
     Write-Host "  IncludeTeams: $IncludeTeams"
     Write-Host "  IncludeOneDrive: $IncludeOneDrive"
     Write-Host "  SharedComputerLicensing: $SetSharedActivation"
+    Write-Host "  ExcludeNewOutlook: $ExcludeNewOutlook"
     Write-Host ""
 
     # Install Evergreen module
@@ -87,6 +92,7 @@ try {
     $ExcludeApps = @("Lync", "Groove")  # Always exclude Skype for Business and Groove
 
     if (-not $IncludeOneDrive) { $ExcludeApps += "OneDrive" }
+    if ($ExcludeNewOutlook) { $ExcludeApps += "OutlookNew" }
 
     # Build ExcludeApp XML elements
     $ExcludeAppXml = ($ExcludeApps | ForEach-Object { "      <ExcludeApp ID=`"$_`" />" }) -join "`n"
