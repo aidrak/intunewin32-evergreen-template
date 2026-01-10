@@ -5,14 +5,15 @@
 
 .DESCRIPTION
     Downloads ODT via Evergreen and installs Microsoft 365 Apps with dynamic configuration.
-    Default: Full suite (Word, Excel, PowerPoint, OneNote, Outlook, Access, Publisher)
-    without Shared Computer Licensing. Desktop shortcuts always published to Public Desktop.
+    Default: Full suite (Word, Excel, PowerPoint, OneNote, Outlook, Access, Publisher, Teams, OneDrive)
+    without Shared Computer Licensing. Desktop shortcuts published to Public Desktop.
+    Any app can be excluded using the -Exclude* parameters.
 
-.PARAMETER IncludeTeams
-    Include Microsoft Teams (uses O365ProPlusRetail SKU instead of EEA NoTeams SKU)
+.PARAMETER ExcludeTeams
+    Exclude Microsoft Teams
 
-.PARAMETER IncludeOneDrive
-    Include OneDrive sync client
+.PARAMETER ExcludeOneDrive
+    Exclude OneDrive sync client
 
 .PARAMETER SetSharedActivation
     Enable Shared Computer Licensing (for VDI/RDS/multi-user scenarios)
@@ -20,28 +21,64 @@
 .PARAMETER ExcludeNewOutlook
     Exclude the new Outlook app (installs only classic Outlook)
 
-.EXAMPLE
-    # Standard workstation (default)
-    .\Install.ps1
+.PARAMETER ExcludeWord
+    Exclude Microsoft Word
+
+.PARAMETER ExcludeExcel
+    Exclude Microsoft Excel
+
+.PARAMETER ExcludePowerPoint
+    Exclude Microsoft PowerPoint
+
+.PARAMETER ExcludeOneNote
+    Exclude Microsoft OneNote
+
+.PARAMETER ExcludeOutlook
+    Exclude Microsoft Outlook (both classic and new)
+
+.PARAMETER ExcludeAccess
+    Exclude Microsoft Access
+
+.PARAMETER ExcludePublisher
+    Exclude Microsoft Publisher
+
+.PARAMETER SkipShortcuts
+    Skip creating desktop shortcuts for Office apps
 
 .EXAMPLE
-    # With Teams and OneDrive
-    .\Install.ps1 -IncludeTeams -IncludeOneDrive
+    # Full suite install (default) - includes Teams, OneDrive, and all Office apps
+    .\Install.ps1
 
 .EXAMPLE
     # VDI/RDS environment with shared licensing
     .\Install.ps1 -SetSharedActivation
 
 .EXAMPLE
-    # Full suite for VDI with Teams
-    .\Install.ps1 -IncludeTeams -IncludeOneDrive -SetSharedActivation
+    # Exclude Teams and OneDrive
+    .\Install.ps1 -ExcludeTeams -ExcludeOneDrive
+
+.EXAMPLE
+    # Minimal install: Word, Excel, Outlook only
+    .\Install.ps1 -ExcludeTeams -ExcludeOneDrive -ExcludePowerPoint -ExcludeOneNote -ExcludeAccess -ExcludePublisher
+
+.EXAMPLE
+    # No desktop shortcuts
+    .\Install.ps1 -SkipShortcuts
 #>
 
 param(
-    [switch]$IncludeTeams,
-    [switch]$IncludeOneDrive,
+    [switch]$ExcludeTeams,
+    [switch]$ExcludeOneDrive,
     [switch]$SetSharedActivation,
-    [switch]$ExcludeNewOutlook
+    [switch]$ExcludeNewOutlook,
+    [switch]$ExcludeWord,
+    [switch]$ExcludeExcel,
+    [switch]$ExcludePowerPoint,
+    [switch]$ExcludeOneNote,
+    [switch]$ExcludeOutlook,
+    [switch]$ExcludeAccess,
+    [switch]$ExcludePublisher,
+    [switch]$SkipShortcuts
 )
 
 $AppName = "Microsoft365Apps"
@@ -61,10 +98,18 @@ try {
     Write-Host "Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
     Write-Host ""
     Write-Host "Configuration:"
-    Write-Host "  IncludeTeams: $IncludeTeams"
-    Write-Host "  IncludeOneDrive: $IncludeOneDrive"
-    Write-Host "  SharedComputerLicensing: $SetSharedActivation"
+    Write-Host "  ExcludeTeams: $ExcludeTeams"
+    Write-Host "  ExcludeOneDrive: $ExcludeOneDrive"
+    Write-Host "  ExcludeWord: $ExcludeWord"
+    Write-Host "  ExcludeExcel: $ExcludeExcel"
+    Write-Host "  ExcludePowerPoint: $ExcludePowerPoint"
+    Write-Host "  ExcludeOneNote: $ExcludeOneNote"
+    Write-Host "  ExcludeOutlook: $ExcludeOutlook"
+    Write-Host "  ExcludeAccess: $ExcludeAccess"
+    Write-Host "  ExcludePublisher: $ExcludePublisher"
     Write-Host "  ExcludeNewOutlook: $ExcludeNewOutlook"
+    Write-Host "  SharedComputerLicensing: $SetSharedActivation"
+    Write-Host "  SkipShortcuts: $SkipShortcuts"
     Write-Host ""
 
     # Install Evergreen module
@@ -91,14 +136,22 @@ try {
     # Build ExcludeApp list
     $ExcludeApps = @("Lync", "Groove")  # Always exclude Skype for Business and Groove
 
-    if (-not $IncludeOneDrive) { $ExcludeApps += "OneDrive" }
+    if ($ExcludeTeams) { $ExcludeApps += "Teams" }
+    if ($ExcludeOneDrive) { $ExcludeApps += "OneDrive" }
     if ($ExcludeNewOutlook) { $ExcludeApps += "OutlookNew" }
+    if ($ExcludeWord) { $ExcludeApps += "Word" }
+    if ($ExcludeExcel) { $ExcludeApps += "Excel" }
+    if ($ExcludePowerPoint) { $ExcludeApps += "PowerPoint" }
+    if ($ExcludeOneNote) { $ExcludeApps += "OneNote" }
+    if ($ExcludeOutlook) { $ExcludeApps += "Outlook" }
+    if ($ExcludeAccess) { $ExcludeApps += "Access" }
+    if ($ExcludePublisher) { $ExcludeApps += "Publisher" }
 
     # Build ExcludeApp XML elements
     $ExcludeAppXml = ($ExcludeApps | ForEach-Object { "      <ExcludeApp ID=`"$_`" />" }) -join "`n"
 
-    # Select Product ID based on Teams inclusion
-    $ProductID = if ($IncludeTeams) { "O365ProPlusRetail" } else { "O365ProPlusEEANoTeamsRetail" }
+    # Product ID - always use O365ProPlusRetail, control apps via ExcludeApp
+    $ProductID = "O365ProPlusRetail"
 
     # Shared Computer Licensing
     $SharedComputerValue = if ($SetSharedActivation) { "1" } else { "0" }
@@ -146,17 +199,18 @@ $ExcludeAppXml
         Write-Host "Microsoft 365 Apps installation initiated successfully!" -ForegroundColor Green
 
         # Create scheduled task to create shortcuts after Office finishes installing
-        Write-Host "Creating scheduled task for desktop shortcuts..." -ForegroundColor Yellow
+        if (-not $SkipShortcuts) {
+            Write-Host "Creating scheduled task for desktop shortcuts..." -ForegroundColor Yellow
 
-        $TaskName = "M365Apps-CreateShortcuts"
-        $ScriptPath = "C:\ProgramData\Intune\Scripts\M365Apps-CreateShortcuts.ps1"
-        $ScriptDir = Split-Path $ScriptPath -Parent
+            $TaskName = "M365Apps-CreateShortcuts"
+            $ScriptPath = "C:\ProgramData\Intune\Scripts\M365Apps-CreateShortcuts.ps1"
+            $ScriptDir = Split-Path $ScriptPath -Parent
 
-        # Create script directory
-        New-Item -ItemType Directory -Path $ScriptDir -Force | Out-Null
+            # Create script directory
+            New-Item -ItemType Directory -Path $ScriptDir -Force | Out-Null
 
-        # Build shortcut script with current parameters embedded
-        $ShortcutScript = @"
+            # Build shortcut script with current parameters embedded
+            $ShortcutScript = @"
 # M365Apps-CreateShortcuts.ps1 - One-shot scheduled task script
 `$LogFile = "C:\ProgramData\Intune\Logs\M365Apps-Shortcuts.log"
 `$TaskName = "M365Apps-CreateShortcuts"
@@ -193,16 +247,15 @@ Write-Log "Office installation detected. Creating shortcuts..."
 `$PublicDesktop = "`$env:PUBLIC\Desktop"
 `$WshShell = New-Object -ComObject WScript.Shell
 
-# Core Office apps
-`$OfficeApps = @{
-    "Word"       = "WINWORD.EXE"
-    "Excel"      = "EXCEL.EXE"
-    "PowerPoint" = "POWERPNT.EXE"
-    "OneNote"    = "ONENOTE.EXE"
-    "Outlook"    = "OUTLOOK.EXE"
-    "Access"     = "MSACCESS.EXE"
-    "Publisher"  = "MSPUB.EXE"
-}
+# Core Office apps (only include apps that weren't excluded)
+`$OfficeApps = @{}
+if (-not `$$($ExcludeWord.ToString().ToLower())) { `$OfficeApps["Word"] = "WINWORD.EXE" }
+if (-not `$$($ExcludeExcel.ToString().ToLower())) { `$OfficeApps["Excel"] = "EXCEL.EXE" }
+if (-not `$$($ExcludePowerPoint.ToString().ToLower())) { `$OfficeApps["PowerPoint"] = "POWERPNT.EXE" }
+if (-not `$$($ExcludeOneNote.ToString().ToLower())) { `$OfficeApps["OneNote"] = "ONENOTE.EXE" }
+if (-not `$$($ExcludeOutlook.ToString().ToLower())) { `$OfficeApps["Outlook"] = "OUTLOOK.EXE" }
+if (-not `$$($ExcludeAccess.ToString().ToLower())) { `$OfficeApps["Access"] = "MSACCESS.EXE" }
+if (-not `$$($ExcludePublisher.ToString().ToLower())) { `$OfficeApps["Publisher"] = "MSPUB.EXE" }
 
 foreach (`$App in `$OfficeApps.GetEnumerator()) {
     `$ExePath = Join-Path `$OfficeRoot `$App.Value
@@ -216,9 +269,9 @@ foreach (`$App in `$OfficeApps.GetEnumerator()) {
     }
 }
 
-# OneDrive (if installed)
-`$IncludeOneDrive = `$$($IncludeOneDrive.ToString().ToLower())
-if (`$IncludeOneDrive) {
+# OneDrive (if not excluded)
+`$ExcludeOneDrive = `$$($ExcludeOneDrive.ToString().ToLower())
+if (-not `$ExcludeOneDrive) {
     `$OneDriveExe = "`$env:ProgramFiles\Microsoft OneDrive\OneDrive.exe"
     if (Test-Path `$OneDriveExe) {
         `$ShortcutPath = Join-Path `$PublicDesktop "OneDrive.lnk"
@@ -229,9 +282,9 @@ if (`$IncludeOneDrive) {
     }
 }
 
-# Teams (if installed)
-`$IncludeTeams = `$$($IncludeTeams.ToString().ToLower())
-if (`$IncludeTeams) {
+# Teams (if not excluded)
+`$ExcludeTeams = `$$($ExcludeTeams.ToString().ToLower())
+if (-not `$ExcludeTeams) {
     `$TeamsExe = "`$env:ProgramFiles\WindowsApps\MSTeams_*\ms-teams.exe"
     `$TeamsPath = Get-Item `$TeamsExe -ErrorAction SilentlyContinue | Select-Object -First 1
     if (`$TeamsPath) {
@@ -250,24 +303,27 @@ Unregister-ScheduledTask -TaskName `$TaskName -Confirm:`$false -ErrorAction Sile
 Remove-Item -Path `$MyInvocation.MyCommand.Path -Force -ErrorAction SilentlyContinue
 "@
 
-        # Save the script
-        $ShortcutScript | Out-File -FilePath $ScriptPath -Encoding UTF8 -Force
-        Write-Host "  Shortcut script saved to: $ScriptPath" -ForegroundColor Green
+            # Save the script
+            $ShortcutScript | Out-File -FilePath $ScriptPath -Encoding UTF8 -Force
+            Write-Host "  Shortcut script saved to: $ScriptPath" -ForegroundColor Green
 
-        # Create scheduled task - runs at startup with 2 minute delay
-        $Action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$ScriptPath`""
-        $Trigger = New-ScheduledTaskTrigger -AtStartup
-        $Trigger.Delay = "PT2M"  # 2 minute delay after startup
-        $Principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -RunLevel Highest -LogonType ServiceAccount
-        $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+            # Create scheduled task - runs at startup with 2 minute delay
+            $Action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$ScriptPath`""
+            $Trigger = New-ScheduledTaskTrigger -AtStartup
+            $Trigger.Delay = "PT2M"  # 2 minute delay after startup
+            $Principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -RunLevel Highest -LogonType ServiceAccount
+            $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
 
-        # Remove existing task if present
-        Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
+            # Remove existing task if present
+            Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
 
-        # Register the task
-        Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Principal $Principal -Settings $Settings -Description "Creates Microsoft 365 Apps desktop shortcuts after installation completes" | Out-Null
-        Write-Host "  Scheduled task '$TaskName' created" -ForegroundColor Green
-        Write-Host "  Shortcuts will be created after next reboot (or when Office install completes)" -ForegroundColor Yellow
+            # Register the task
+            Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Principal $Principal -Settings $Settings -Description "Creates Microsoft 365 Apps desktop shortcuts after installation completes" | Out-Null
+            Write-Host "  Scheduled task '$TaskName' created" -ForegroundColor Green
+            Write-Host "  Shortcuts will be created after next reboot (or when Office install completes)" -ForegroundColor Yellow
+        } else {
+            Write-Host "Skipping desktop shortcut creation (-SkipShortcuts specified)" -ForegroundColor Yellow
+        }
 
     } else {
         Write-Host "Installation completed with exit code: $($Process.ExitCode)" -ForegroundColor Yellow
