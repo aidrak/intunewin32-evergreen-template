@@ -26,8 +26,8 @@ Deploys Adobe Acrobat Reader DC x64 using the Evergreen module to always install
 | Setting | Value |
 |---------|-------|
 | **Rule type** | File |
-| **Path** | `C:\Program Files\Adobe\Acrobat Reader DC\Reader` |
-| **File** | `AcroRd64.exe` |
+| **Path** | `C:\Program Files\Adobe\Acrobat DC\Acrobat` |
+| **File** | `Acrobat.exe` |
 | **Detection method** | File or folder exists |
 
 ### Requirements
