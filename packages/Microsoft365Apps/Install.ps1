@@ -122,6 +122,12 @@ try {
         Install-Module -Name Evergreen -Force -Scope AllUsers
     }
     Import-Module Evergreen -Force
+
+    # Ensure Evergreen cache directory exists (required for SYSTEM account)
+    $EvergreenPath = Join-Path $env:LOCALAPPDATA "Evergreen"
+    if (-not (Test-Path $EvergreenPath)) {
+        New-Item -ItemType Directory -Path $EvergreenPath -Force | Out-Null
+    }
     Update-Evergreen -Force
 
     # Get Office Deployment Tool

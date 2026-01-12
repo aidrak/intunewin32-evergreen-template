@@ -54,9 +54,15 @@ try {
     }
     Import-Module -Name Evergreen -Force
 
-    # Download Evergreen app manifests (required for SYSTEM account)
+    # Ensure Evergreen cache directory exists (required for SYSTEM account)
+    $EvergreenPath = Join-Path $env:LOCALAPPDATA "Evergreen"
+    if (-not (Test-Path $EvergreenPath)) {
+        New-Item -ItemType Directory -Path $EvergreenPath -Force | Out-Null
+    }
+
+    # Download Evergreen app manifests
     Write-Log "Updating Evergreen manifests..."
-    Update-Evergreen -ErrorAction SilentlyContinue
+    Update-Evergreen
 
     # Get latest version - AdobeAcrobatProStdDC provides Pro/Standard DC downloads
     Write-Log "Querying Evergreen for latest version..."
