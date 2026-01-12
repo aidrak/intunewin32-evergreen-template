@@ -186,49 +186,39 @@ $ExcludeAppXml
 
         # Wait for Office Click-to-Run to complete installation
         Write-Host "Waiting for Office Click-to-Run installation to complete..." -ForegroundColor Yellow
-        $C2RConfig = "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration"
         $MaxAttempts = 120  # 120 attempts x 30 seconds = 60 minutes max wait
         $AttemptDelay = 30  # seconds
         $Attempt = 0
         $InstallComplete = $false
+        $OfficeRoot = $null
+
+        # Hardcoded paths where Word can be installed (avoids 32/64-bit registry issues)
+        $WordPaths = @(
+            "C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE",
+            "C:\Program Files (x86)\Microsoft Office\root\Office16\WINWORD.EXE"
+        )
 
         while ($Attempt -lt $MaxAttempts -and -not $InstallComplete) {
             $Attempt++
 
-            # Get registry configuration (source of truth for C2R installs)
-            $Config = Get-ItemProperty -Path $C2RConfig -ErrorAction SilentlyContinue
-
-            if ($Config) {
-                $VersionToReport = $Config.VersionToReport
-                $InstallationPath = $Config.InstallationPath
-
-                # Build Word path from registry's InstallationPath (avoids 32/64-bit issues)
-                $WordPath = $null
-                $WordExists = $false
-                if ($InstallationPath) {
-                    $WordPath = Join-Path $InstallationPath "root\Office16\WINWORD.EXE"
-                    $WordExists = Test-Path $WordPath
-                }
-
-                # Installation complete when: VersionToReport exists AND Word executable exists
-                if ($VersionToReport -and $WordExists) {
-                    Write-Host "  Office installation complete! Version: $VersionToReport" -ForegroundColor Green
-                    Write-Host "  Installation path: $InstallationPath" -ForegroundColor Green
+            # Check each possible Word location
+            foreach ($WordPath in $WordPaths) {
+                if (Test-Path $WordPath) {
+                    $OfficeRoot = Split-Path $WordPath -Parent
+                    Write-Host "  Office installation complete! Found Word at: $WordPath" -ForegroundColor Green
                     $InstallComplete = $true
-                    $OfficeRoot = Join-Path $InstallationPath "root\Office16"
-                } else {
-                    Write-Host "  Attempt $Attempt/$MaxAttempts - Version: $VersionToReport, Path: $InstallationPath, Word: $WordExists"
-                    Start-Sleep -Seconds $AttemptDelay
+                    break
                 }
-            } else {
-                Write-Host "  Attempt $Attempt/$MaxAttempts - Waiting for C2R registry..."
+            }
+
+            if (-not $InstallComplete) {
+                Write-Host "  Attempt $Attempt/$MaxAttempts - Waiting for Office installation..."
                 Start-Sleep -Seconds $AttemptDelay
             }
         }
 
         if (-not $InstallComplete) {
             Write-Host "WARNING: Office installation may not have completed within timeout period" -ForegroundColor Yellow
-            # Set fallback path for shortcuts
             $OfficeRoot = "C:\Program Files\Microsoft Office\root\Office16"
         }
 
