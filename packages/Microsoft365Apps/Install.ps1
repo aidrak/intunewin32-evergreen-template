@@ -186,8 +186,9 @@ $ExcludeAppXml
 
         # Wait for Office Click-to-Run to complete installation
         Write-Host "Waiting for Office Click-to-Run installation to complete..." -ForegroundColor Yellow
-        $OfficeRoot = "$env:ProgramFiles\Microsoft Office\root\Office16"
-        $WordExe = Join-Path $OfficeRoot "WINWORD.EXE"
+        # Hardcode path to avoid 32-bit/64-bit environment variable issues in SYSTEM context
+        $OfficeRoot = "C:\Program Files\Microsoft Office\root\Office16"
+        $WordExe = "$OfficeRoot\WINWORD.EXE"
         $MaxAttempts = 120  # 120 attempts x 30 seconds = 60 minutes max wait
         $AttemptDelay = 30  # seconds
         $Attempt = 0
@@ -329,7 +330,7 @@ $ExcludeAppXml
 
             # OneDrive shortcut (if not excluded)
             if (-not $ExcludeOneDrive) {
-                $OneDriveExe = "$env:ProgramFiles\Microsoft OneDrive\OneDrive.exe"
+                $OneDriveExe = "C:\Program Files\Microsoft OneDrive\OneDrive.exe"
                 if (Test-Path $OneDriveExe) {
                     $ShortcutPath = Join-Path $PublicDesktop "OneDrive.lnk"
                     $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
@@ -341,7 +342,7 @@ $ExcludeAppXml
 
             # Teams shortcut (if not excluded)
             if (-not $ExcludeTeams) {
-                $TeamsExe = "$env:ProgramFiles\WindowsApps\MSTeams_*\ms-teams.exe"
+                $TeamsExe = "C:\Program Files\WindowsApps\MSTeams_*\ms-teams.exe"
                 $TeamsPath = Get-Item $TeamsExe -ErrorAction SilentlyContinue | Select-Object -First 1
                 if ($TeamsPath) {
                     $ShortcutPath = Join-Path $PublicDesktop "Microsoft Teams.lnk"
