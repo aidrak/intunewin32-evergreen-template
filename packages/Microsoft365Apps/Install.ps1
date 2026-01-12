@@ -192,25 +192,48 @@ $ExcludeAppXml
         $AttemptDelay = 30  # seconds
         $Attempt = 0
 
-        # Poll for Office installation completion using multiple methods
+        # Phase 1: Wait for installation to START (C2R process appears OR registry key created)
+        Write-Host "  Waiting for Click-to-Run to start..." -ForegroundColor Gray
+        $C2RConfig = "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration"
+        $InstallStarted = $false
+
+        while ($Attempt -lt $MaxAttempts -and -not $InstallStarted) {
+            $Attempt++
+            $C2RRunning = Get-Process -Name "OfficeC2RClient", "OfficeClickToRun" -ErrorAction SilentlyContinue
+            $RegistryExists = Test-Path $C2RConfig
+
+            if ($C2RRunning -or $RegistryExists) {
+                Write-Host "  Click-to-Run installation started (attempt $Attempt)" -ForegroundColor Green
+                $InstallStarted = $true
+            } else {
+                Write-Host "  Attempt $Attempt/$MaxAttempts - Waiting for C2R to start..."
+                Start-Sleep -Seconds $AttemptDelay
+            }
+        }
+
+        if (-not $InstallStarted) {
+            Write-Host "WARNING: Click-to-Run never started. ODT may have failed silently." -ForegroundColor Yellow
+        }
+
+        # Phase 2: Wait for installation to COMPLETE (Word exists AND version reported AND C2R not running)
+        Write-Host "  Waiting for installation to complete..." -ForegroundColor Gray
         while ($Attempt -lt $MaxAttempts) {
             $Attempt++
 
-            # Method 1: Check if C2R client is still running
-            $C2RRunning = Get-Process -Name "OfficeC2RClient" -ErrorAction SilentlyContinue
+            # Check if C2R client is still running
+            $C2RRunning = Get-Process -Name "OfficeC2RClient", "OfficeClickToRun" -ErrorAction SilentlyContinue
 
-            # Method 2: Check if Word executable exists
+            # Check if Word executable exists
             $WordExists = Test-Path $WordExe
 
-            # Method 3: Check registry for installation completion
-            $C2RConfig = "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration"
+            # Check registry for version (indicates installation complete)
             $VersionToReport = $null
             if (Test-Path $C2RConfig) {
                 $VersionToReport = (Get-ItemProperty -Path $C2RConfig -ErrorAction SilentlyContinue).VersionToReport
             }
 
-            # Installation is complete when: C2R not running AND Word exists AND version is reported
-            if (-not $C2RRunning -and $WordExists -and $VersionToReport) {
+            # Installation is complete when: Word exists AND version is reported AND C2R not running
+            if ($WordExists -and $VersionToReport -and -not $C2RRunning) {
                 Write-Host "Office installation complete! Version: $VersionToReport" -ForegroundColor Green
                 break
             }
