@@ -186,66 +186,50 @@ $ExcludeAppXml
 
         # Wait for Office Click-to-Run to complete installation
         Write-Host "Waiting for Office Click-to-Run installation to complete..." -ForegroundColor Yellow
-        # Hardcode path to avoid 32-bit/64-bit environment variable issues in SYSTEM context
-        $OfficeRoot = "C:\Program Files\Microsoft Office\root\Office16"
-        $WordExe = "$OfficeRoot\WINWORD.EXE"
+        $C2RConfig = "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration"
         $MaxAttempts = 120  # 120 attempts x 30 seconds = 60 minutes max wait
         $AttemptDelay = 30  # seconds
         $Attempt = 0
+        $InstallComplete = $false
 
-        # Phase 1: Wait for installation to START (C2R process appears OR registry key created)
-        Write-Host "  Waiting for Click-to-Run to start..." -ForegroundColor Gray
-        $C2RConfig = "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration"
-        $InstallStarted = $false
-
-        while ($Attempt -lt $MaxAttempts -and -not $InstallStarted) {
+        while ($Attempt -lt $MaxAttempts -and -not $InstallComplete) {
             $Attempt++
-            $C2RRunning = Get-Process -Name "OfficeC2RClient", "OfficeClickToRun" -ErrorAction SilentlyContinue
-            $RegistryExists = Test-Path $C2RConfig
 
-            if ($C2RRunning -or $RegistryExists) {
-                Write-Host "  Click-to-Run installation started (attempt $Attempt)" -ForegroundColor Green
-                $InstallStarted = $true
+            # Get registry configuration (source of truth for C2R installs)
+            $Config = Get-ItemProperty -Path $C2RConfig -ErrorAction SilentlyContinue
+
+            if ($Config) {
+                $VersionToReport = $Config.VersionToReport
+                $InstallationPath = $Config.InstallationPath
+
+                # Build Word path from registry's InstallationPath (avoids 32/64-bit issues)
+                $WordPath = $null
+                $WordExists = $false
+                if ($InstallationPath) {
+                    $WordPath = Join-Path $InstallationPath "root\Office16\WINWORD.EXE"
+                    $WordExists = Test-Path $WordPath
+                }
+
+                # Installation complete when: VersionToReport exists AND Word executable exists
+                if ($VersionToReport -and $WordExists) {
+                    Write-Host "  Office installation complete! Version: $VersionToReport" -ForegroundColor Green
+                    Write-Host "  Installation path: $InstallationPath" -ForegroundColor Green
+                    $InstallComplete = $true
+                    $OfficeRoot = Join-Path $InstallationPath "root\Office16"
+                } else {
+                    Write-Host "  Attempt $Attempt/$MaxAttempts - Version: $VersionToReport, Path: $InstallationPath, Word: $WordExists"
+                    Start-Sleep -Seconds $AttemptDelay
+                }
             } else {
-                Write-Host "  Attempt $Attempt/$MaxAttempts - Waiting for C2R to start..."
+                Write-Host "  Attempt $Attempt/$MaxAttempts - Waiting for C2R registry..."
                 Start-Sleep -Seconds $AttemptDelay
             }
         }
 
-        if (-not $InstallStarted) {
-            Write-Host "WARNING: Click-to-Run never started. ODT may have failed silently." -ForegroundColor Yellow
-        }
-
-        # Phase 2: Wait for installation to COMPLETE (Word exists AND version reported AND C2R not running)
-        Write-Host "  Waiting for installation to complete..." -ForegroundColor Gray
-        while ($Attempt -lt $MaxAttempts) {
-            $Attempt++
-
-            # Check if C2R client is still running
-            $C2RRunning = Get-Process -Name "OfficeC2RClient", "OfficeClickToRun" -ErrorAction SilentlyContinue
-
-            # Check if Word executable exists
-            $WordExists = Test-Path $WordExe
-
-            # Check registry for version (indicates installation complete)
-            $VersionToReport = $null
-            if (Test-Path $C2RConfig) {
-                $VersionToReport = (Get-ItemProperty -Path $C2RConfig -ErrorAction SilentlyContinue).VersionToReport
-            }
-
-            # Installation is complete when: Word exists AND version is reported AND C2R not running
-            if ($WordExists -and $VersionToReport -and -not $C2RRunning) {
-                Write-Host "Office installation complete! Version: $VersionToReport" -ForegroundColor Green
-                break
-            }
-
-            $Status = "C2R Running: $([bool]$C2RRunning), Word Exists: $WordExists, Version: $VersionToReport"
-            Write-Host "  Attempt $Attempt/$MaxAttempts - $Status"
-            Start-Sleep -Seconds $AttemptDelay
-        }
-
-        if ($Attempt -ge $MaxAttempts) {
+        if (-not $InstallComplete) {
             Write-Host "WARNING: Office installation may not have completed within timeout period" -ForegroundColor Yellow
+            # Set fallback path for shortcuts
+            $OfficeRoot = "C:\Program Files\Microsoft Office\root\Office16"
         }
 
         # Remove Teams if -ExcludeTeams was specified (ODT doesn't reliably exclude new MSIX Teams)
