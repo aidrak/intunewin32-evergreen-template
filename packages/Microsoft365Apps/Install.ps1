@@ -4,7 +4,7 @@
     Installs Microsoft 365 Apps using Office Deployment Tool with configurable options.
 
 .DESCRIPTION
-    Downloads ODT via Evergreen and installs Microsoft 365 Apps with dynamic configuration.
+    Downloads ODT directly from Microsoft CDN and installs Microsoft 365 Apps with dynamic configuration.
     Default: Full suite (Word, Excel, PowerPoint, OneNote, Outlook, Access, Publisher, Teams, OneDrive)
     without Shared Computer Licensing. Desktop shortcuts published to Public Desktop.
     Any app can be excluded using the -Exclude* parameters.
@@ -112,29 +112,8 @@ try {
     Write-Host "  SkipShortcuts: $SkipShortcuts"
     Write-Host ""
 
-    # Install Evergreen module
-    Write-Host "Installing Evergreen module..." -ForegroundColor Yellow
-    if (-not (Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue)) {
-        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force | Out-Null
-    }
-    Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-    if (-not (Get-Module -Name Evergreen -ListAvailable)) {
-        Install-Module -Name Evergreen -Force -Scope AllUsers
-    }
-    Import-Module Evergreen -Force
-
-    # Ensure Evergreen cache directory exists (required for SYSTEM account)
-    $EvergreenPath = Join-Path $env:LOCALAPPDATA "Evergreen"
-    if (-not (Test-Path $EvergreenPath)) {
-        New-Item -ItemType Directory -Path $EvergreenPath -Force | Out-Null
-    }
-    Update-Evergreen -Force
-
-    # Get Office Deployment Tool
+    # Download Office Deployment Tool
     Write-Host "Downloading Office Deployment Tool..." -ForegroundColor Yellow
-    $ODT = Get-EvergreenApp -Name "Microsoft365Apps" | Where-Object { $_.Channel -eq "MonthlyEnterprise" } | Select-Object -First 1
-
-    # Download ODT setup.exe from Microsoft
     $ODTUrl = "https://officecdn.microsoft.com/pr/wsus/setup.exe"
     $ODTPath = "$DownloadPath\setup.exe"
     Invoke-WebRequest -Uri $ODTUrl -OutFile $ODTPath -UseBasicParsing
