@@ -4,7 +4,7 @@
     Installs Microsoft 365 Apps using Office Deployment Tool with configurable options.
 
 .DESCRIPTION
-    Downloads ODT via Evergreen and installs Microsoft 365 Apps with dynamic configuration.
+    Downloads ODT directly from Microsoft CDN and installs Microsoft 365 Apps with dynamic configuration.
     Default: Full suite (Word, Excel, PowerPoint, OneNote, Outlook, Access, Publisher, Teams, OneDrive)
     without Shared Computer Licensing. Desktop shortcuts published to Public Desktop.
     Any app can be excluded using the -Exclude* parameters.
@@ -112,23 +112,8 @@ try {
     Write-Host "  SkipShortcuts: $SkipShortcuts"
     Write-Host ""
 
-    # Install Evergreen module
-    Write-Host "Installing Evergreen module..." -ForegroundColor Yellow
-    if (-not (Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue)) {
-        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force | Out-Null
-    }
-    Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-    if (-not (Get-Module -Name Evergreen -ListAvailable)) {
-        Install-Module -Name Evergreen -Force -Scope AllUsers
-    }
-    Import-Module Evergreen -Force
-    Update-Evergreen -Force
-
-    # Get Office Deployment Tool
+    # Download Office Deployment Tool
     Write-Host "Downloading Office Deployment Tool..." -ForegroundColor Yellow
-    $ODT = Get-EvergreenApp -Name "Microsoft365Apps" | Where-Object { $_.Channel -eq "MonthlyEnterprise" } | Select-Object -First 1
-
-    # Download ODT setup.exe from Microsoft
     $ODTUrl = "https://officecdn.microsoft.com/pr/wsus/setup.exe"
     $ODTPath = "$DownloadPath\setup.exe"
     Invoke-WebRequest -Uri $ODTUrl -OutFile $ODTPath -UseBasicParsing
@@ -197,136 +182,161 @@ $ExcludeAppXml
 
     if ($Process.ExitCode -eq 0) {
         Write-Host "Microsoft 365 Apps installation initiated successfully!" -ForegroundColor Green
+        Write-Host ""
 
-        # Create scheduled task to create shortcuts after Office finishes installing
+        # Wait for Office Click-to-Run to complete installation
+        Write-Host "Waiting for Office Click-to-Run installation to complete..." -ForegroundColor Yellow
+        $MaxAttempts = 120  # 120 attempts x 30 seconds = 60 minutes max wait
+        $AttemptDelay = 30  # seconds
+        $Attempt = 0
+        $InstallComplete = $false
+        $OfficeRoot = $null
+
+        # Hardcoded paths where Word can be installed (avoids 32/64-bit registry issues)
+        $WordPaths = @(
+            "C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE",
+            "C:\Program Files (x86)\Microsoft Office\root\Office16\WINWORD.EXE"
+        )
+
+        while ($Attempt -lt $MaxAttempts -and -not $InstallComplete) {
+            $Attempt++
+
+            # Check each possible Word location
+            foreach ($WordPath in $WordPaths) {
+                if (Test-Path $WordPath) {
+                    $OfficeRoot = Split-Path $WordPath -Parent
+                    Write-Host "  Office installation complete! Found Word at: $WordPath" -ForegroundColor Green
+                    $InstallComplete = $true
+                    break
+                }
+            }
+
+            if (-not $InstallComplete) {
+                Write-Host "  Attempt $Attempt/$MaxAttempts - Waiting for Office installation..."
+                Start-Sleep -Seconds $AttemptDelay
+            }
+        }
+
+        if (-not $InstallComplete) {
+            Write-Host "WARNING: Office installation may not have completed within timeout period" -ForegroundColor Yellow
+            $OfficeRoot = "C:\Program Files\Microsoft Office\root\Office16"
+        }
+
+        # Remove Teams if -ExcludeTeams was specified (ODT doesn't reliably exclude new MSIX Teams)
+        if ($ExcludeTeams) {
+            Write-Host ""
+            Write-Host "Removing Microsoft Teams (MSIX)..." -ForegroundColor Yellow
+
+            # Remove provisioned package (prevents install for new users)
+            $TeamsProvisioned = Get-AppxProvisionedPackage -Online | Where-Object { $_.DisplayName -like "*MSTeams*" }
+            if ($TeamsProvisioned) {
+                $TeamsProvisioned | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue
+                Write-Host "  Removed provisioned Teams package" -ForegroundColor Green
+            }
+
+            # Remove installed instances for all users
+            $TeamsInstalled = Get-AppxPackage -AllUsers -Name "*MSTeams*" -ErrorAction SilentlyContinue
+            if ($TeamsInstalled) {
+                $TeamsInstalled | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
+                Write-Host "  Removed installed Teams instances" -ForegroundColor Green
+            }
+
+            if (-not $TeamsProvisioned -and -not $TeamsInstalled) {
+                Write-Host "  Teams was not found (already removed or not installed)" -ForegroundColor Green
+            }
+        }
+
+        # Remove New Outlook if -ExcludeNewOutlook was specified (ODT doesn't reliably exclude it)
+        if ($ExcludeNewOutlook) {
+            Write-Host ""
+            Write-Host "Removing New Outlook (OutlookForWindows)..." -ForegroundColor Yellow
+
+            # Remove provisioned package (prevents install for new users)
+            $OutlookProvisioned = Get-AppxProvisionedPackage -Online | Where-Object { $_.PackageName -like "*OutlookForWindows*" }
+            if ($OutlookProvisioned) {
+                $OutlookProvisioned | Remove-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue
+                Write-Host "  Removed provisioned New Outlook package" -ForegroundColor Green
+            }
+
+            # Remove installed instances for all users
+            $OutlookInstalled = Get-AppxPackage -AllUsers -Name "*OutlookForWindows*" -ErrorAction SilentlyContinue
+            if ($OutlookInstalled) {
+                $OutlookInstalled | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue
+                Write-Host "  Removed installed New Outlook instances" -ForegroundColor Green
+            }
+
+            if (-not $OutlookProvisioned -and -not $OutlookInstalled) {
+                Write-Host "  New Outlook was not found (already removed or not installed)" -ForegroundColor Green
+            }
+        }
+
+        # Create desktop shortcuts
         if (-not $SkipShortcuts) {
-            Write-Host "Creating scheduled task for desktop shortcuts..." -ForegroundColor Yellow
+            Write-Host ""
+            Write-Host "Creating desktop shortcuts..." -ForegroundColor Yellow
 
-            $TaskName = "M365Apps-CreateShortcuts"
-            $ScriptPath = "C:\ProgramData\Intune\Scripts\M365Apps-CreateShortcuts.ps1"
-            $ScriptDir = Split-Path $ScriptPath -Parent
+            $PublicDesktop = "$env:PUBLIC\Desktop"
+            $WshShell = New-Object -ComObject WScript.Shell
 
-            # Create script directory
-            New-Item -ItemType Directory -Path $ScriptDir -Force | Out-Null
+            # Core Office apps - only create shortcuts for apps that weren't excluded
+            $OfficeApps = @{}
+            if (-not $ExcludeWord) { $OfficeApps["Word"] = "WINWORD.EXE" }
+            if (-not $ExcludeExcel) { $OfficeApps["Excel"] = "EXCEL.EXE" }
+            if (-not $ExcludePowerPoint) { $OfficeApps["PowerPoint"] = "POWERPNT.EXE" }
+            if (-not $ExcludeOneNote) { $OfficeApps["OneNote"] = "ONENOTE.EXE" }
+            if (-not $ExcludeOutlook) { $OfficeApps["Outlook"] = "OUTLOOK.EXE" }
+            if (-not $ExcludeAccess) { $OfficeApps["Access"] = "MSACCESS.EXE" }
+            if (-not $ExcludePublisher) { $OfficeApps["Publisher"] = "MSPUB.EXE" }
 
-            # Build shortcut script with current parameters embedded
-            $ShortcutScript = @"
-# M365Apps-CreateShortcuts.ps1 - One-shot scheduled task script
-`$LogFile = "C:\ProgramData\Intune\Logs\M365Apps-Shortcuts.log"
-`$TaskName = "M365Apps-CreateShortcuts"
-`$MaxAttempts = 60  # 60 attempts x 60 seconds = 60 minutes max wait
-`$AttemptDelay = 60  # seconds
+            foreach ($App in $OfficeApps.GetEnumerator()) {
+                $ExePath = Join-Path $OfficeRoot $App.Value
+                if (Test-Path $ExePath) {
+                    $ShortcutPath = Join-Path $PublicDesktop "$($App.Key).lnk"
+                    $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
+                    $Shortcut.TargetPath = $ExePath
+                    $Shortcut.WorkingDirectory = $OfficeRoot
+                    $Shortcut.Save()
+                    Write-Host "  Created: $($App.Key).lnk" -ForegroundColor Green
+                } else {
+                    Write-Host "  Skipped: $($App.Key) (not found)" -ForegroundColor Yellow
+                }
+            }
 
-function Write-Log {
-    param([string]`$Message)
-    `$Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    Add-Content -Path `$LogFile -Value "[`$Timestamp] `$Message" -ErrorAction SilentlyContinue
-}
+            # OneDrive shortcut (if not excluded)
+            if (-not $ExcludeOneDrive) {
+                $OneDriveExe = "C:\Program Files\Microsoft OneDrive\OneDrive.exe"
+                if (Test-Path $OneDriveExe) {
+                    $ShortcutPath = Join-Path $PublicDesktop "OneDrive.lnk"
+                    $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
+                    $Shortcut.TargetPath = $OneDriveExe
+                    $Shortcut.Save()
+                    Write-Host "  Created: OneDrive.lnk" -ForegroundColor Green
+                }
+            }
 
-Write-Log "Shortcut creation task started"
-
-`$OfficeRoot = "`$env:ProgramFiles\Microsoft Office\root\Office16"
-`$WordExe = Join-Path `$OfficeRoot "WINWORD.EXE"
-
-# Wait for Office to finish installing
-`$Attempt = 0
-while (-not (Test-Path `$WordExe) -and `$Attempt -lt `$MaxAttempts) {
-    `$Attempt++
-    Write-Log "Waiting for Office installation (attempt `$Attempt/`$MaxAttempts)..."
-    Start-Sleep -Seconds `$AttemptDelay
-}
-
-if (-not (Test-Path `$WordExe)) {
-    Write-Log "ERROR: Office installation not detected after `$MaxAttempts attempts. Exiting."
-    Unregister-ScheduledTask -TaskName `$TaskName -Confirm:`$false -ErrorAction SilentlyContinue
-    exit 1
-}
-
-Write-Log "Office installation detected. Creating shortcuts..."
-
-`$PublicDesktop = "`$env:PUBLIC\Desktop"
-`$WshShell = New-Object -ComObject WScript.Shell
-
-# Core Office apps (only include apps that weren't excluded)
-`$OfficeApps = @{}
-if (-not `$$($ExcludeWord.ToString().ToLower())) { `$OfficeApps["Word"] = "WINWORD.EXE" }
-if (-not `$$($ExcludeExcel.ToString().ToLower())) { `$OfficeApps["Excel"] = "EXCEL.EXE" }
-if (-not `$$($ExcludePowerPoint.ToString().ToLower())) { `$OfficeApps["PowerPoint"] = "POWERPNT.EXE" }
-if (-not `$$($ExcludeOneNote.ToString().ToLower())) { `$OfficeApps["OneNote"] = "ONENOTE.EXE" }
-if (-not `$$($ExcludeOutlook.ToString().ToLower())) { `$OfficeApps["Outlook"] = "OUTLOOK.EXE" }
-if (-not `$$($ExcludeAccess.ToString().ToLower())) { `$OfficeApps["Access"] = "MSACCESS.EXE" }
-if (-not `$$($ExcludePublisher.ToString().ToLower())) { `$OfficeApps["Publisher"] = "MSPUB.EXE" }
-
-foreach (`$App in `$OfficeApps.GetEnumerator()) {
-    `$ExePath = Join-Path `$OfficeRoot `$App.Value
-    if (Test-Path `$ExePath) {
-        `$ShortcutPath = Join-Path `$PublicDesktop "`$(`$App.Key).lnk"
-        `$Shortcut = `$WshShell.CreateShortcut(`$ShortcutPath)
-        `$Shortcut.TargetPath = `$ExePath
-        `$Shortcut.WorkingDirectory = `$OfficeRoot
-        `$Shortcut.Save()
-        Write-Log "Created: `$(`$App.Key).lnk"
-    }
-}
-
-# OneDrive (if not excluded)
-`$ExcludeOneDrive = `$$($ExcludeOneDrive.ToString().ToLower())
-if (-not `$ExcludeOneDrive) {
-    `$OneDriveExe = "`$env:ProgramFiles\Microsoft OneDrive\OneDrive.exe"
-    if (Test-Path `$OneDriveExe) {
-        `$ShortcutPath = Join-Path `$PublicDesktop "OneDrive.lnk"
-        `$Shortcut = `$WshShell.CreateShortcut(`$ShortcutPath)
-        `$Shortcut.TargetPath = `$OneDriveExe
-        `$Shortcut.Save()
-        Write-Log "Created: OneDrive.lnk"
-    }
-}
-
-# Teams (if not excluded)
-`$ExcludeTeams = `$$($ExcludeTeams.ToString().ToLower())
-if (-not `$ExcludeTeams) {
-    `$TeamsExe = "`$env:ProgramFiles\WindowsApps\MSTeams_*\ms-teams.exe"
-    `$TeamsPath = Get-Item `$TeamsExe -ErrorAction SilentlyContinue | Select-Object -First 1
-    if (`$TeamsPath) {
-        `$ShortcutPath = Join-Path `$PublicDesktop "Microsoft Teams.lnk"
-        `$Shortcut = `$WshShell.CreateShortcut(`$ShortcutPath)
-        `$Shortcut.TargetPath = `$TeamsPath.FullName
-        `$Shortcut.Save()
-        Write-Log "Created: Microsoft Teams.lnk"
-    }
-}
-
-Write-Log "Shortcut creation complete. Removing scheduled task."
-
-# Clean up - remove the scheduled task and script
-Unregister-ScheduledTask -TaskName `$TaskName -Confirm:`$false -ErrorAction SilentlyContinue
-Remove-Item -Path `$MyInvocation.MyCommand.Path -Force -ErrorAction SilentlyContinue
-"@
-
-            # Save the script
-            $ShortcutScript | Out-File -FilePath $ScriptPath -Encoding UTF8 -Force
-            Write-Host "  Shortcut script saved to: $ScriptPath" -ForegroundColor Green
-
-            # Create scheduled task - runs at startup with 2 minute delay
-            $Action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$ScriptPath`""
-            $Trigger = New-ScheduledTaskTrigger -AtStartup
-            $Trigger.Delay = "PT2M"  # 2 minute delay after startup
-            $Principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -RunLevel Highest -LogonType ServiceAccount
-            $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
-
-            # Remove existing task if present
-            Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
-
-            # Register the task
-            Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Principal $Principal -Settings $Settings -Description "Creates Microsoft 365 Apps desktop shortcuts after installation completes" | Out-Null
-            Write-Host "  Scheduled task '$TaskName' created" -ForegroundColor Green
-            Write-Host "  Shortcuts will be created after next reboot (or when Office install completes)" -ForegroundColor Yellow
+            # Teams shortcut (if not excluded)
+            if (-not $ExcludeTeams) {
+                $TeamsExe = "C:\Program Files\WindowsApps\MSTeams_*\ms-teams.exe"
+                $TeamsPath = Get-Item $TeamsExe -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($TeamsPath) {
+                    $ShortcutPath = Join-Path $PublicDesktop "Microsoft Teams.lnk"
+                    $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
+                    $Shortcut.TargetPath = $TeamsPath.FullName
+                    $Shortcut.Save()
+                    Write-Host "  Created: Microsoft Teams.lnk" -ForegroundColor Green
+                }
+            }
         } else {
             Write-Host "Skipping desktop shortcut creation (-SkipShortcuts specified)" -ForegroundColor Yellow
         }
 
+        Write-Host ""
+        Write-Host "Installation complete. Signaling reboot required (exit code 1641)." -ForegroundColor Cyan
+
     } else {
-        Write-Host "Installation completed with exit code: $($Process.ExitCode)" -ForegroundColor Yellow
+        Write-Host "Installation failed with exit code: $($Process.ExitCode)" -ForegroundColor Red
+        Stop-Transcript
+        exit $Process.ExitCode
     }
 
     # Cleanup
@@ -334,7 +344,10 @@ Remove-Item -Path `$MyInvocation.MyCommand.Path -Force -ErrorAction SilentlyCont
     Remove-Item -Path $DownloadPath -Recurse -Force -ErrorAction SilentlyContinue
 
     Stop-Transcript
-    exit $Process.ExitCode
+
+    # Exit with 1641 to signal Intune that a hard reboot is required
+    # Intune will display a countdown dialog and force restart after grace period (default 120 min)
+    exit 1641
 
 } catch {
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red

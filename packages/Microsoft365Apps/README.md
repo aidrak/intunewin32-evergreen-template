@@ -70,6 +70,7 @@ Deploys Microsoft 365 Apps using the Office Deployment Tool (ODT) with full cust
 | **Uninstall command** | `powershell.exe -ExecutionPolicy Bypass -File .\Uninstall.ps1` |
 | **Install behavior** | System |
 | **Device restart behavior** | Determine behavior based on return codes |
+| **Return codes** | `0` = Success, `1641` = Hard reboot (defaults are fine) |
 
 ### Detection Rule
 
@@ -156,16 +157,62 @@ Build the `.intunewin` package once, then create multiple Win32 apps in Intune w
 
 ## Desktop Shortcuts
 
-By default, the installer creates a scheduled task that runs after reboot to create desktop shortcuts on the Public Desktop (`C:\Users\Public\Desktop`) for all installed apps.
+By default, the installer creates desktop shortcuts on the Public Desktop (`C:\Users\Public\Desktop`) for all installed apps immediately after Office installation completes.
 
-**Why a scheduled task?**
-- Office installation continues in the background after ODT returns
-- Shortcuts are created once Office apps are fully installed
-- Task self-deletes after creating shortcuts
+The script polls for Office Click-to-Run completion (up to 60 minutes) using:
+- Process monitoring (OfficeC2RClient.exe)
+- File existence checks (WINWORD.EXE)
+- Registry verification (VersionToReport)
 
 **To disable:** Use `-SkipShortcuts`
 
-**Shortcut log:** `C:\ProgramData\Intune\Logs\M365Apps-Shortcuts.log`
+---
+
+## MSIX App Removal
+
+Microsoft bundles MSIX versions of Teams and New Outlook with Windows 11 and Office. The ODT `ExcludeApp` directive may not reliably prevent their installation. This script handles cleanup automatically.
+
+### Teams Removal (`-ExcludeTeams`)
+
+When specified, the installer will:
+1. Exclude Teams from the ODT configuration
+2. Remove the MSIX Teams package if it was installed anyway
+3. Remove the provisioned package to prevent future installs for new users
+
+### New Outlook Removal (`-ExcludeNewOutlook`)
+
+When specified, the installer will:
+1. Exclude New Outlook from the ODT configuration
+2. Remove the OutlookForWindows MSIX package if present
+3. Remove the provisioned package to prevent future installs for new users
+
+> **Tip:** If you want classic Outlook only, use `-ExcludeNewOutlook`. If you want no Outlook at all, use `-ExcludeOutlook` (excludes both).
+
+---
+
+## Reboot Handling
+
+The script exits with code **1641** (hard reboot) to signal Intune that a restart is required.
+
+### Intune Return Code Configuration
+
+| Return Code | Type | Behavior |
+|-------------|------|----------|
+| 1641 | Hard reboot | Forces restart with countdown (default 120 min). Blocks next app until reboot. |
+| 3010 | Soft reboot | Notifies user via toast notification only. During ESP, batches reboots at end. |
+
+### Intune Settings (Program Page)
+
+Ensure these settings in your Win32 app configuration:
+
+| Setting | Recommended Value |
+|---------|-------------------|
+| **Device restart behavior** | Determine behavior based on return codes |
+| **Return codes** | `1641` → Hard reboot (default) |
+
+If you prefer a **soft reboot** (notification only, no forced restart):
+- Change the script to `exit 3010` instead of `exit 1641`, OR
+- Change `1641` to "Soft reboot" in Intune return codes
 
 ---
 
@@ -174,7 +221,6 @@ By default, the installer creates a scheduled task that runs after reboot to cre
 | Log | Path |
 |-----|------|
 | Install log | `C:\ProgramData\Intune\Logs\Microsoft365Apps-Install.log` |
-| Shortcut log | `C:\ProgramData\Intune\Logs\M365Apps-Shortcuts.log` |
 
 ---
 
@@ -184,3 +230,4 @@ By default, the installer creates a scheduled task that runs after reboot to cre
 - **RemoveMSI**: Automatically removes legacy MSI-based Office installations before installing
 - **EULA**: Automatically accepted during silent install
 - **Force App Shutdown**: Enabled - running Office apps will be closed during install
+- **Install Duration**: Script waits for Office Click-to-Run to complete (up to 60 minutes) before exiting
