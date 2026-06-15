@@ -11,7 +11,8 @@
 param()
 
 $AppName = "GoogleChrome"
-$LogPath = "C:\ProgramData\Microsoft\IntuneManagementExtension\Logs"
+$BasePath = "C:\ProgramData\Intune"
+$LogPath = Join-Path -Path $BasePath -ChildPath "Logs"
 $LogFile = Join-Path -Path $LogPath -ChildPath "$AppName-Uninstall.log"
 
 function Write-Log {
