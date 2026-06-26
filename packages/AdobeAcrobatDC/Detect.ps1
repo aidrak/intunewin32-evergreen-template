@@ -19,8 +19,14 @@ $Paths = @(
 foreach ($Path in $Paths) {
     if (Test-Path -Path $Path) {
         $Version = (Get-Item -Path $Path).VersionInfo.FileVersion
-        Write-Output "Adobe Acrobat DC $Version detected"
-        exit 0
+        $FLPath = "HKLM:\SOFTWARE\Policies\Adobe\Adobe Acrobat\DC\FeatureLockDown"
+        $ReducedMode = (Get-ItemProperty -Path $FLPath -Name "bIsSCReducedModeEnforcedEx" -ErrorAction SilentlyContinue).bIsSCReducedModeEnforcedEx
+        if ($ReducedMode -eq 1) {
+            Write-Output "Adobe Acrobat DC $Version detected (reduced mode enabled)"
+            exit 0
+        }
+        Write-Output "Adobe Acrobat DC $Version detected but reduced mode not configured"
+        exit 1
     }
 }
 

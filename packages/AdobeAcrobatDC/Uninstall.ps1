@@ -47,6 +47,12 @@ try {
         Write-Log "Adobe Acrobat DC not found"
     }
 
+    # Clean up reduced mode registry keys
+    $FLPath = "HKLM:\SOFTWARE\Policies\Adobe\Adobe Acrobat\DC\FeatureLockDown"
+    if (Test-Path "$FLPath\cIPM") { Remove-Item -Path "$FLPath\cIPM" -Force -ErrorAction SilentlyContinue }
+    if (Test-Path $FLPath) { Remove-Item -Path $FLPath -Force -ErrorAction SilentlyContinue }
+    Write-Log "Cleaned up reduced mode registry keys"
+
     exit 0
 }
 catch {

@@ -110,6 +110,18 @@ try {
     # Wait for install to complete
     Start-Sleep -Seconds 15
 
+    # Set reduced mode — unlicensed users get Reader functionality, licensed users get full Acrobat
+    Write-Log "Configuring reduced mode registry keys..."
+    $FLPath = "HKLM:\SOFTWARE\Policies\Adobe\Adobe Acrobat\DC\FeatureLockDown"
+    if (-not (Test-Path $FLPath)) { New-Item -Path $FLPath -Force | Out-Null }
+    New-ItemProperty -Path $FLPath -Name "bIsSCReducedModeEnforcedEx" -Value 1 -PropertyType DWORD -Force | Out-Null
+
+    # Suppress in-product messaging nag
+    $IPMPath = "$FLPath\cIPM"
+    if (-not (Test-Path $IPMPath)) { New-Item -Path $IPMPath -Force | Out-Null }
+    New-ItemProperty -Path $IPMPath -Name "bDontShowMsgWhenViewingDoc" -Value 0 -PropertyType DWORD -Force | Out-Null
+    Write-Log "Reduced mode configured"
+
     # Cleanup
     Remove-Item -Path $TempPath -Recurse -Force -ErrorAction SilentlyContinue
     Write-Log "Installation complete"
