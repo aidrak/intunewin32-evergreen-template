@@ -94,6 +94,8 @@ pwsh -Command "New-IntuneWinPackage -SourcePath 'packages-static/AppName' -Setup
 ```
 The user configures install/uninstall/detection directly in Intune (e.g., install command: `AppName.exe /S`).
 
+**Note:** `.exe` and `.intunewin` files in `packages-static/` are gitignored (too large for GitHub). Only scripts and docs are tracked. Store/distribute binaries separately.
+
 ### Creating a Static Package (with scripts)
 
 When asked to create a static package with scripts, ask the user for:

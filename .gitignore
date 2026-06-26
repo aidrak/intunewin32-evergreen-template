@@ -16,5 +16,7 @@ tools/
 # Installer binaries (download separately, not stored in repo)
 *.msi
 
-# Note: .exe files in packages-static/ are intentionally tracked (bundled installers)
+# Static package binaries (too large for GitHub, store/distribute separately)
+packages-static/**/*.exe
+packages-static/**/*.intunewin
 
