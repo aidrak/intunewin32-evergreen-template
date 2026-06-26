@@ -42,6 +42,23 @@ pwsh -Command "New-IntuneWinPackage -SourcePath 'packages/SentinelOne' -SetupFil
 .\IntuneWinAppUtil.exe -c "packages\SentinelOne" -s "SentinelOne.txt" -o "packages\SentinelOne" -q
 ```
 
+## Build Static .exe Packages
+
+Static packages in `packages-static/` bundle a pre-downloaded `.exe` installer. The build process is the same — all files in the source folder (including the `.exe`) are packaged into the `.intunewin`.
+
+### Linux/macOS
+```bash
+# Generic pattern
+pwsh -Command "New-IntuneWinPackage -SourcePath 'packages-static/APPNAME' -SetupFile 'APPNAME.txt' -DestinationPath '/tmp'" && mv /tmp/APPNAME.intunewin packages-static/APPNAME/
+```
+
+### Windows
+```powershell
+.\IntuneWinAppUtil.exe -c "packages-static\APPNAME" -s "APPNAME.txt" -o "packages-static\APPNAME" -q
+```
+
+**Note:** Static `.intunewin` files will be larger than Evergreen packages since they contain the installer binary.
+
 ## Extract .intunewin Package (Optional)
 
 To inspect package contents:

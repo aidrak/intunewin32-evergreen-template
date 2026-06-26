@@ -1,8 +1,9 @@
 # Intune Win32 Evergreen Template
 
-Deploy Windows applications via Microsoft Intune that **automatically download the latest version** at install time using the [Evergreen](https://github.com/aaronparker/evergreen) PowerShell module.
+Deploy Windows applications via Microsoft Intune using two packaging approaches:
 
-**No need to repackage when updates are released** - the scripts always pull the latest version from the vendor.
+- **Evergreen packages** (`packages/`) — **Automatically download the latest version** at install time using the [Evergreen](https://github.com/aaronparker/evergreen) PowerShell module. No need to repackage when updates are released.
+- **Static packages** (`packages-static/`) — Bundle a pre-downloaded `.exe` installer directly into the package. No internet access required at install time, but must be rebuilt for new versions.
 
 ## How It Works
 
@@ -29,27 +30,20 @@ See each package's README for Intune configuration details.
 ## Repository Structure
 
 ```
-packages/
+packages/                        # Evergreen-based (auto-download latest)
 ├── GoogleChrome/
-│   ├── GoogleChrome.intunewin
-│   ├── Install.ps1
-│   ├── Uninstall.ps1
-│   └── README.md
 ├── AdobeAcrobatReaderDC/
-│   ├── AdobeAcrobatReaderDC.intunewin
-│   ├── Install.ps1
-│   ├── Uninstall.ps1
-│   └── README.md
 ├── AdobeAcrobatDC/
-│   ├── AdobeAcrobatDC.intunewin
-│   ├── Install.ps1
-│   ├── Uninstall.ps1
-│   └── README.md
 └── Microsoft365Apps/
-    ├── Microsoft365Apps.intunewin
+
+packages-static/                 # Static .exe installer packages
+└── AppName/
+    ├── SomeInstaller.exe
+    ├── AppName.txt
     ├── Install.ps1
     ├── Uninstall.ps1
-    └── README.md
+    ├── Detect.ps1
+    └── AppName.intunewin
 ```
 
 ## Quick Start

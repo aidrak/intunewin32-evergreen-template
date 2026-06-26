@@ -16,3 +16,5 @@ tools/
 # Installer binaries (download separately, not stored in repo)
 *.msi
 
+# Note: .exe files in packages-static/ are intentionally tracked (bundled installers)
+
